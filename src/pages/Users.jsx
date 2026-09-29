@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { UserCheck, UserX } from 'lucide-react'
 import { AdminHeader, AdminTable, AdminToolbar, NameCell, RefreshButton, StatusPill } from './AdminParts'
-import { apiRequest } from '../api/client'
+import { apiRequest, apiRequestAll } from '../api/client'
 
 const FILTERS = ['All', 'Workers', 'Clients', 'Active', 'Deactivated']
 
@@ -10,13 +10,21 @@ const Users = () => {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('All')
   const [actionLoading, setActionLoading] = useState(null)
+  const [error, setError] = useState(null)
 
+  // The user list doesn't include `isDeactivatedByAdmin`, but the endpoint can filter on it,
+  // so a second query for deactivated accounts supplies the flag.
   const loadUsers = async () => {
     try {
-      const res = await apiRequest('/admin/users')
-      setUsers(res?.data?.users || [])
+      const [all, deactivated] = await Promise.all([
+        apiRequestAll('/admin/users', 'users'),
+        apiRequestAll('/admin/users', 'users', { isDeactivated: 'true' }),
+      ])
+      const deactivatedIds = new Set(deactivated.map((u) => u._id))
+      setUsers(all.map((u) => ({ ...u, isDeactivatedByAdmin: deactivatedIds.has(u._id) })))
+      setError(null)
     } catch (err) {
-      console.warn('Failed to load users:', err)
+      setError(err.message)
     }
   }
 
@@ -26,7 +34,7 @@ const Users = () => {
 
   const handleToggleDeactivate = async (user) => {
     const nextState = !user.isDeactivatedByAdmin
-    if (!window.confirm(`Are you sure you want to ${nextState ? 'deactivate' : 'reactivate'} ${user.fullName}?`)) {
+    if (!window.confirm(`Are you sure you want to ${nextState ? 'deactivate' : 'reactivate'} ${user.fullName || user.email}?${nextState ? ' They will be signed out of every device.' : ''}`)) {
       return
     }
 
@@ -150,7 +158,7 @@ const Users = () => {
       <AdminTable
         columns={columns}
         rows={rows}
-        empty="No user accounts match your search."
+        empty={error ? `Couldn't load users: ${error}` : 'No user accounts match your search.'}
       />
     </div>
   )

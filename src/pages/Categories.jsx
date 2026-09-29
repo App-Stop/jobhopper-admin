@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { AdminHeader, AdminModal, AdminTable, AdminToolbar, NameCell, RefreshButton, StatusPill } from './AdminParts'
-import { apiRequest } from '../api/client'
+import { apiRequest, apiRequestAll } from '../api/client'
 
 const FILTERS = ['All', 'Active', 'Inactive']
 
@@ -15,13 +15,14 @@ const Categories = () => {
   const [description, setDescription] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
   const loadCategories = async () => {
     try {
-      const res = await apiRequest('/categories')
-      setCategories(res?.data?.categories || [])
+      setCategories(await apiRequestAll('/categories', 'categories'))
+      setError(null)
     } catch (err) {
-      console.warn('Failed to load categories:', err)
+      setError(err.message)
     }
   }
 
@@ -63,12 +64,14 @@ const Categories = () => {
       if (editingCat) {
         await apiRequest(`/categories/${editingCat._id}`, {
           method: 'PATCH',
-          body: JSON.stringify({ name: name.trim(), description: description.trim(), isActive }),
+          // isActive is validated as the string 'true' | 'false' (the route also accepts multipart).
+          body: JSON.stringify({ name: name.trim(), description: description.trim(), isActive: String(isActive) }),
         })
       } else {
         await apiRequest('/categories', {
           method: 'POST',
-          body: JSON.stringify({ name: name.trim(), description: description.trim(), isActive }),
+          // isActive is validated as the string 'true' | 'false' (the route also accepts multipart).
+          body: JSON.stringify({ name: name.trim(), description: description.trim(), isActive: String(isActive) }),
         })
       }
       setModalOpen(false)
@@ -87,7 +90,7 @@ const Categories = () => {
       if (filter === 'Active') matchesFilter = c.isActive !== false
       else if (filter === 'Inactive') matchesFilter = c.isActive === false
 
-      const matchesQuery = !q || [c.name, c.slug, c.description || ''].some((f) => f.toLowerCase().includes(q))
+      const matchesQuery = !q || [c.name, c.slug, c.description].some((f) => (f || '').toLowerCase().includes(q))
       return matchesFilter && matchesQuery
     })
   }, [categories, query, filter])
@@ -172,7 +175,7 @@ const Categories = () => {
       <AdminTable
         columns={columns}
         rows={rows}
-        empty="No trade categories match your filter."
+        empty={error ? `Couldn't load categories: ${error}` : 'No trade categories match your filter.'}
       />
 
       {modalOpen && (

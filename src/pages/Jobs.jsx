@@ -1,22 +1,44 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Eye, MapPin, Zap } from 'lucide-react'
 import { AdminHeader, AdminModal, AdminTable, AdminToolbar, NameCell, RefreshButton, StatusPill } from './AdminParts'
-import { apiRequest } from '../api/client'
+import { apiRequestAll } from '../api/client'
+import { ACTIVE_JOB_STATUSES, JOB_STATUS_GROUPS as FILTER_STATUSES } from '../constants'
 
-const FILTERS = ['All', 'Open', 'En Route', 'In Progress', 'Completed', 'Disputed']
+const FILTERS = ['All', ...Object.keys(FILTER_STATUSES)]
+
+const URGENCY_LABELS = { standard: 'Standard', within_24h: 'Within 24h', asap: 'ASAP' }
+
+const money = (v) =>
+  v === null || v === undefined
+    ? '—'
+    : Number(v).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+
+const formatDate = (d) =>
+  d
+    ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : '—'
+
+const formatAddress = (a) =>
+  a && typeof a === 'object'
+    ? [a.street, a.apartment, a.city, a.state, a.zipCode, a.country].filter(Boolean).join(', ') || '—'
+    : '—'
+
+// Agreed price once a worker is hired, otherwise the client's posted budget.
+const jobAmount = (j) => j.finalAmount ?? j.budget
 
 const Jobs = () => {
   const [jobs, setJobs] = useState([])
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('All')
   const [selectedJob, setSelectedJob] = useState(null)
+  const [error, setError] = useState(null)
 
   const loadJobs = async () => {
     try {
-      const res = await apiRequest('/admin/jobs')
-      setJobs(res?.data?.jobs || [])
+      setJobs(await apiRequestAll('/admin/jobs', 'jobs'))
+      setError(null)
     } catch (err) {
-      console.warn('Failed to load jobs:', err)
+      setError(err.message)
     }
   }
 
@@ -27,19 +49,10 @@ const Jobs = () => {
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
     return jobs.filter((j) => {
-      let matchesFilter = true
-      const s = (j.status || '').toLowerCase()
-      if (filter === 'Open') matchesFilter = s === 'open'
-      else if (filter === 'En Route') matchesFilter = s === 'en_route'
-      else if (filter === 'In Progress') matchesFilter = ['arrived', 'started'].includes(s)
-      else if (filter === 'Completed') matchesFilter = ['completed', 'paid'].includes(s)
-      else if (filter === 'Disputed') matchesFilter = s === 'disputed'
+      const matchesFilter = filter === 'All' || FILTER_STATUSES[filter].includes(j.status)
 
-      const code = j.jobCode || ''
-      const title = j.title || ''
-      const client = j.client?.fullName || ''
-      const worker = j.worker?.fullName || ''
-      const matchesQuery = !q || [code, title, client, worker].some((f) => f.toLowerCase().includes(q))
+      const fields = [j.jobCode, j.title, j.category?.name, j.client?.fullName, j.worker?.fullName]
+      const matchesQuery = !q || fields.some((f) => (f || '').toLowerCase().includes(q))
 
       return matchesFilter && matchesQuery
     })
@@ -51,7 +64,7 @@ const Jobs = () => {
       label: 'Job Order',
       render: (j) => (
         <NameCell
-          name={j.jobCode}
+          name={j.jobCode || 'Job'}
           sub={j.title || j.category?.name || 'Service Job'}
           avatarChar={j.category?.name?.[0] || 'J'}
         />
@@ -60,14 +73,13 @@ const Jobs = () => {
     {
       key: 'client',
       label: 'Client',
-      render: (j) => <span className="admin-cell-strong">{j.client?.fullName || 'Client'}</span>,
+      render: (j) => <span className="admin-cell-strong">{j.client?.fullName || '—'}</span>,
     },
     {
       key: 'worker',
       label: 'Assigned Worker',
-      render: (j) => (
-        <span>{j.worker?.fullName ? j.worker.fullName : <em className="text-muted">Unassigned</em>}</span>
-      ),
+      render: (j) =>
+        j.worker?.fullName ? <span>{j.worker.fullName}</span> : <em className="text-muted">Unassigned</em>,
     },
     {
       key: 'urgency',
@@ -78,14 +90,16 @@ const Jobs = () => {
             <Zap className="size-3.5" strokeWidth={2} /> ASAP
           </span>
         ) : (
-          <span className="text-[12px] font-semibold uppercase text-muted">{j.urgency || '—'}</span>
+          <span className="text-[12px] font-semibold uppercase text-muted">
+            {URGENCY_LABELS[j.urgency] || j.urgency || '—'}
+          </span>
         ),
     },
     {
-      key: 'budget',
-      label: 'Escrow Amount',
+      key: 'amount',
+      label: 'Job Amount',
       align: 'right',
-      render: (j) => <span className="font-semibold text-primary">${j.finalAmount || j.budget}</span>,
+      render: (j) => <span className="font-semibold text-primary">{money(jobAmount(j))}</span>,
     },
     {
       key: 'status',
@@ -106,21 +120,21 @@ const Jobs = () => {
     },
   ]
 
-  const activeCount = jobs.filter((j) => ['open', 'en_route', 'arrived', 'started'].includes(j.status)).length
+  const activeCount = jobs.filter((j) => ACTIVE_JOB_STATUSES.includes(j.status)).length
 
   return (
     <div className="admin-page">
       <AdminHeader
         title="Jobs & Orders"
         count={jobs.length}
-        subtitle={`${activeCount} jobs in progress. Track orders from dispatch to completion and escrow release.`}
+        subtitle={`${activeCount} jobs booked or in progress. Track orders from dispatch to completion and escrow release.`}
         actions={<RefreshButton onRefresh={loadJobs} />}
       />
 
       <AdminToolbar
         query={query}
         onQuery={setQuery}
-        placeholder="Search job code, title, client or worker"
+        placeholder="Search job code, title, trade, client or worker"
         filters={FILTERS}
         filter={filter}
         onFilter={setFilter}
@@ -130,21 +144,24 @@ const Jobs = () => {
       <AdminTable
         columns={columns}
         rows={rows}
-        empty="No jobs match your search."
+        empty={error ? `Couldn't load jobs: ${error}` : 'No jobs match your search.'}
       />
 
       {selectedJob && (
         <AdminModal
-          title={selectedJob.jobCode}
-          subtitle={selectedJob.title || selectedJob.category?.name}
+          title={selectedJob.jobCode || 'Job'}
+          subtitle={[selectedJob.title, selectedJob.category?.name].filter(Boolean).join(' · ')}
           onClose={() => setSelectedJob(null)}
           footer={
             <>
               <p className="mr-auto text-[13px] text-muted">
-                Escrow{' '}
-                <span className="ml-1 text-[17px] font-bold tabular-nums text-primary">
-                  ${selectedJob.finalAmount || selectedJob.budget}
+                {selectedJob.finalAmount !== null && selectedJob.finalAmount !== undefined ? 'Agreed price' : 'Budget'}
+                <span className="ml-2 text-[17px] font-bold tabular-nums text-primary">
+                  {money(jobAmount(selectedJob))}
                 </span>
+                {selectedJob.priorityFee > 0 && (
+                  <span className="ml-1.5">+ {money(selectedJob.priorityFee)} priority</span>
+                )}
               </p>
               <button type="button" className="btn btn-primary" onClick={() => setSelectedJob(null)}>
                 Close
@@ -152,10 +169,12 @@ const Jobs = () => {
             </>
           }
         >
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={selectedJob.status} />
-            {selectedJob.urgency === 'asap' && (
-              <span className="admin-status admin-status--pending">ASAP emergency</span>
+            {selectedJob.urgency && (
+              <span className={`admin-status ${selectedJob.urgency === 'asap' ? 'admin-status--pending' : 'admin-status--inactive'}`}>
+                {URGENCY_LABELS[selectedJob.urgency] || selectedJob.urgency}
+              </span>
             )}
           </div>
 
@@ -166,16 +185,34 @@ const Jobs = () => {
             </div>
           )}
 
+          {selectedJob.photos?.some((p) => p?.location) && (
+            <div className="grid grid-cols-3 gap-2">
+              {selectedJob.photos
+                .filter((p) => p?.location)
+                .map((p) => (
+                  <a key={p._id} href={p.location} target="_blank" rel="noreferrer" className="aspect-square overflow-hidden rounded-xl border border-line">
+                    <img src={p.location} alt={p.filename || 'Job photo'} className="size-full object-cover" />
+                  </a>
+                ))}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="admin-info-box">
               <p className="admin-info-label">Client</p>
               <p className="font-semibold text-dark-900">{selectedJob.client?.fullName || '—'}</p>
-              <p className="text-[12px] text-muted">{selectedJob.client?.email}</p>
             </div>
             <div className="admin-info-box">
               <p className="admin-info-label">Worker</p>
               <p className="font-semibold text-dark-900">{selectedJob.worker?.fullName || 'Unassigned'}</p>
-              <p className="text-[12px] text-muted">{selectedJob.worker?.email || 'Awaiting assignment'}</p>
+            </div>
+            <div className="admin-info-box">
+              <p className="admin-info-label">Posted</p>
+              <p className="text-dark-900">{formatDate(selectedJob.createdAt)}</p>
+            </div>
+            <div className="admin-info-box">
+              <p className="admin-info-label">Scheduled for</p>
+              <p className="text-dark-900">{formatDate(selectedJob.scheduledAt)}</p>
             </div>
           </div>
 
@@ -183,9 +220,16 @@ const Jobs = () => {
             <MapPin className="size-4 text-primary shrink-0 mt-0.5" />
             <div>
               <p className="admin-info-label">Service location</p>
-              <p className="text-dark-900">{selectedJob.address?.fullAddress || 'Address on file'}</p>
+              <p className="text-dark-900">{formatAddress(selectedJob.address)}</p>
             </div>
           </div>
+
+          {selectedJob.cancelReason && (
+            <div className="admin-info-box border-rose-200 bg-rose-50/50">
+              <p className="admin-info-label">Cancellation reason</p>
+              <p className="text-dark-900">{selectedJob.cancelReason}</p>
+            </div>
+          )}
         </AdminModal>
       )}
     </div>

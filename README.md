@@ -12,14 +12,14 @@ The admin UI integrates with the endpoints implemented in `job-hopper-backend`:
 
 | Module | Endpoints Covered | Functionality |
 |---|---|---|
-| **Admin Auth** | `POST /admin/login` | Secure administrator authentication with token persistence, role verification, and quick-fill demo credentials. |
+| **Admin Auth** | `POST /admin/login` | Secure administrator authentication with token persistence and role verification. |
 | **Worker Verification Queue** | `GET /admin/workers/verification-queue`<br>`PATCH /admin/workers/:id/verification` | Review submitted Government ID (Front/Back) and live selfie photos. Approve to grant the **Verified Badge** (+20 Trust Score) or reject with custom feedback. |
 | **User Management** | `GET /admin/users`<br>`PATCH /admin/users/:id/deactivate` | Browse and filter registered Workers and Clients. Filter by active/deactivated status. Deactivate or reactivate accounts with one click. |
 | **Jobs & Escrow Orders** | `GET /admin/jobs` | Track marketplace transactions across all lifecycle states (`open`, `en_route`, `arrived`, `started`, `completed`, `paid`, `disputed`). Inspect photos, addresses, budgets, and priority fees. |
 | **Reports & Disputes** | `GET /reports`<br>`PATCH /reports/:id` | Arbitrate client-worker complaints, workmanship disputes, and billing claims with official resolution notes. |
 | **Trade Taxonomy** | `GET /categories`<br>`POST /categories`<br>`PATCH /categories/:id`<br>`DELETE /categories/:id` | Manage active service categories (Plumbing, Electrical, Painting, etc.) and slugs for marketplace search. |
 | **Platform Economics** | `GET /settings/fees`<br>`PATCH /admin/settings` | Configure platform commission %, flat priority dispatch fees, taxes, and response timeouts with a live interactive fee simulator. |
-| **Server Health** | `GET /health` | Real-time status indicator connecting to `VITE_API_URL` (see `.env.example`) with an automatic interactive demo fallback when the backend is offline. |
+| **Server Health** | `GET /health` | Real-time status indicator connecting to `VITE_API_URL` (see `.env.example`) — the admin requires a running backend; there is no offline mode. |
 
 ---
 
@@ -55,5 +55,4 @@ npm run dev
 The admin portal will start at **`http://localhost:5174`** (or next available port).
 
 ### 4. Login
-- **Demo Fill**: Click **"Use Quick Demo Credentials"** on the login screen to sign in instantly with sample data.
 - **Live Backend**: Ensure `job-hopper-backend` is running on `http://localhost:3050` and log in with your seeded administrator credentials.

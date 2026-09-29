@@ -14,50 +14,45 @@ const DEFAULTS = {
 const GROUPS = [
   {
     title: 'Client checkout',
-    hint: 'Added on top of the job budget when a client pays into escrow.',
+    hint: 'Added on top of the job amount when the client pays into escrow — calculated at payment time.',
     icon: Receipt,
     fields: [
       {
         key: 'platformFeePercent',
         label: 'Platform commission',
-        hint: 'Percentage of the job budget kept by JobHopper.',
+        hint: 'Percentage of the job amount charged to the client and kept by JobHopper.',
         suffix: '%',
-        step: 0.1,
         min: 0,
-        max: 50,
+        max: 100,
       },
       {
         key: 'taxPercent',
         label: 'Sales tax',
-        hint: 'Applied to the budget, commission and any priority fee.',
+        hint: 'Applied to the job amount, commission and any priority fee.',
         suffix: '%',
-        step: 0.1,
         min: 0,
-        max: 30,
+        max: 100,
       },
     ],
   },
   {
     title: 'Emergency dispatch',
-    hint: 'ASAP requests that skip the regular bidding flow.',
+    hint: 'Jobs posted with ASAP urgency.',
     icon: Zap,
     fields: [
       {
         key: 'priorityFeeFlat',
         label: 'Priority fee',
-        hint: 'Flat rush fee charged to the client and passed to the worker.',
+        hint: 'Flat rush fee charged to the client and kept by JobHopper. Locked in when the job is posted.',
         prefix: '$',
-        step: 1,
         min: 0,
       },
       {
         key: 'urgentRequestTimeoutSeconds',
-        label: 'Request timeout',
-        hint: 'How long an ASAP request waits for a worker before it expires.',
+        label: 'Urgent request timeout',
+        hint: 'How long a worker has to accept an urgent direct request before it expires.',
         suffix: 'sec',
-        step: 10,
-        min: 30,
-        max: 600,
+        min: 1,
       },
     ],
   },
@@ -69,9 +64,8 @@ const GROUPS = [
       {
         key: 'withdrawalFeeFlat',
         label: 'Withdrawal fee',
-        hint: 'Flat fee per direct withdrawal. Set to 0 to make cash-outs free.',
+        hint: 'Flat fee per withdrawal; the withdrawal amount must be larger than this fee. Set to 0 to make cash-outs free.',
         prefix: '$',
-        step: 0.5,
         min: 0,
       },
     ],
@@ -93,7 +87,7 @@ const formatTimeout = (seconds) => {
 const UnitInput = ({ prefix, suffix, changed, className = '', ...input }) => (
   <label className={`admin-unit-input ${changed ? 'admin-unit-input--changed' : ''} ${className}`}>
     {prefix && <span>{prefix}</span>}
-    <input type="number" inputMode="decimal" required {...input} />
+    <input type="number" inputMode="decimal" step="any" required {...input} />
     {suffix && <span>{suffix}</span>}
   </label>
 )
@@ -103,6 +97,9 @@ const Settings = () => {
   const [baseline, setBaseline] = useState(DEFAULTS)
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState(null) // { type: 'saved' | 'error', message }
+  // Editing stays locked until the live values load, so a save can never write DEFAULTS over real rates.
+  const [loaded, setLoaded] = useState(false)
+  const [loadError, setLoadError] = useState(null)
 
   // Simulator inputs (not persisted)
   const [testAmount, setTestAmount] = useState(150)
@@ -113,11 +110,12 @@ const Settings = () => {
       try {
         const res = await apiRequest('/settings/fees')
         const d = res?.data || {}
-        const loaded = Object.fromEntries(KEYS.map((k) => [k, d[k] ?? DEFAULTS[k]]))
-        setValues(loaded)
-        setBaseline(loaded)
+        const live = Object.fromEntries(KEYS.map((k) => [k, d[k] ?? DEFAULTS[k]]))
+        setValues(live)
+        setBaseline(live)
+        setLoaded(true)
       } catch (err) {
-        console.warn('Failed to load settings:', err)
+        setLoadError(err.message || 'Failed to load the current fee settings.')
       }
     }
     load()
@@ -142,12 +140,14 @@ const Settings = () => {
     setStatus(null)
     const payload = Object.fromEntries(KEYS.map((k) => [k, Number(values[k])]))
     try {
-      await apiRequest('/admin/settings', {
+      const res = await apiRequest('/admin/settings', {
         method: 'PATCH',
         body: JSON.stringify(payload),
       })
-      setValues(payload)
-      setBaseline(payload)
+      // The PATCH response carries the stored settings; treat those as the new source of truth.
+      const saved = Object.fromEntries(KEYS.map((k) => [k, res?.data?.[k] ?? payload[k]]))
+      setValues(saved)
+      setBaseline(saved)
       setStatus({ type: 'saved', message: 'Changes saved' })
       setTimeout(() => setStatus((s) => (s?.type === 'saved' ? null : s)), 3000)
     } catch (err) {
@@ -157,18 +157,21 @@ const Settings = () => {
     }
   }
 
-  // Simulator math — uses the values currently in the form, saved or not.
+  // Simulator math mirrors job-hopper-backend payment.service computeFees (each fee rounded to
+  // cents) and uses the values currently in the form, saved or not.
+  const round2 = (v) => Math.round(v * 100) / 100
   const baseJob = num(testAmount)
   const priorityAdd = testIsUrgent ? num(values.priorityFeeFlat) : 0
-  const platformCut = (baseJob * num(values.platformFeePercent)) / 100
-  const taxable = baseJob + platformCut + priorityAdd
-  const tax = (taxable * num(values.taxPercent)) / 100
-  const clientCharged = taxable + tax
-  const workerPayout = baseJob + priorityAdd
+  const platformCut = round2((baseJob * num(values.platformFeePercent)) / 100)
+  const tax = round2(((baseJob + platformCut + priorityAdd) * num(values.taxPercent)) / 100)
+  const clientCharged = round2(baseJob + platformCut + priorityAdd + tax)
+  // Released to the worker's wallet: the job amount only. Commission and priority fee stay with the platform.
+  const workerPayout = baseJob
+  const platformRevenue = round2(platformCut + priorityAdd)
 
   const split = [
     { label: 'Worker', value: workerPayout, color: 'bg-accent' },
-    { label: 'Platform', value: platformCut, color: 'bg-primary' },
+    { label: 'Platform', value: platformRevenue, color: 'bg-primary' },
     { label: 'Tax', value: tax, color: 'bg-amber-400' },
   ]
 
@@ -176,7 +179,7 @@ const Settings = () => {
     <div className="admin-page">
       <AdminHeader
         title="Fees & Platform"
-        subtitle="Marketplace-wide commission, tax and dispatch rules. Changes apply to new orders only — jobs already in escrow keep their original rates."
+        subtitle="Marketplace-wide commission, tax and dispatch rules. Commission and tax apply to every job paid after you save; the priority fee and request timeout apply to jobs posted after you save."
         actions={
           <>
             {status?.type === 'saved' && (
@@ -192,10 +195,10 @@ const Settings = () => {
             {dirty && !status && (
               <span className="text-[13px] font-medium text-amber-700">Unsaved changes</span>
             )}
-            <button type="button" className="btn btn-outline" onClick={handleDiscard} disabled={!dirty || saving}>
+            <button type="button" className="btn btn-outline" onClick={handleDiscard} disabled={!loaded || !dirty || saving}>
               <RotateCcw strokeWidth={2} /> Discard
             </button>
-            <button type="submit" form="fee-settings" className="btn btn-primary" disabled={!dirty || saving}>
+            <button type="submit" form="fee-settings" className="btn btn-primary" disabled={!loaded || !dirty || saving}>
               <Save strokeWidth={2} /> {saving ? 'Saving…' : 'Save changes'}
             </button>
           </>
@@ -204,6 +207,11 @@ const Settings = () => {
 
       <div className="admin-settings">
         <form id="fee-settings" onSubmit={handleSave} className="admin-settings-groups">
+          {loadError && (
+            <p className="rounded-[14px] border border-rose-200 bg-rose-50 px-4 py-3 text-[13.5px] text-rose-700" role="alert">
+              Couldn't load the current fee settings: {loadError} Editing is disabled until the page is reloaded.
+            </p>
+          )}
           {GROUPS.map(({ title, hint, icon: Icon, fields }) => (
             <section key={title} className="admin-card">
               <div className="admin-card-head justify-start">
@@ -232,6 +240,7 @@ const Settings = () => {
                     value={values[key]}
                     onChange={setField(key)}
                     changed={isChanged(key)}
+                    disabled={!loaded}
                     {...input}
                   />
                 </div>
@@ -331,10 +340,11 @@ const Settings = () => {
                 ))}
               </div>
               <p className="text-[12px] leading-relaxed text-muted">
-                Worker earnings are released from escrow when the job is completed
+                The worker&apos;s wallet is credited with the job amount when the client confirms completion; the
+                commission and priority fee stay with JobHopper.{' '}
                 {num(values.withdrawalFeeFlat) > 0
-                  ? `, minus a ${money(num(values.withdrawalFeeFlat))} fee per withdrawal.`
-                  : '. Withdrawals are free.'}
+                  ? `Each withdrawal then costs the worker ${money(num(values.withdrawalFeeFlat))}.`
+                  : 'Withdrawals are free.'}
               </p>
             </div>
           </div>

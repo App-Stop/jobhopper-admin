@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react'
 import { ChevronRight, DollarSign, ShieldCheck, Users, Zap } from 'lucide-react'
 import { AdminHeader, AdminTable, NameCell, RefreshButton, StatCard, StatusPill } from './AdminParts'
 import { adminLinkClick, adminPaths } from '../navigation'
-import { apiRequest } from '../api/client'
+import { apiCount, apiRequest, apiRequestAll } from '../api/client'
+import { ACTIVE_JOB_STATUSES, PAID_JOB_STATUSES } from '../constants'
 
 const formatCurrency = (val) =>
   Number(val || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 
 const formatNumber = (val) => Number(val || 0).toLocaleString('en-US')
+
+const round2 = (v) => Math.round(v * 100) / 100
 
 const JOB_COLUMNS = [
   {
@@ -24,13 +27,17 @@ const JOB_COLUMNS = [
   {
     key: 'client',
     label: 'Client',
-    render: (j) => <span className="admin-cell-strong">{j.client?.fullName || 'Client'}</span>,
+    render: (j) => <span className="admin-cell-strong">{j.client?.fullName || '—'}</span>,
   },
   {
-    key: 'budget',
-    label: 'Escrow',
+    key: 'amount',
+    label: 'Amount',
     align: 'right',
-    render: (j) => <span className="font-semibold text-primary">${j.finalAmount || j.budget}</span>,
+    render: (j) => (
+      <span className="font-semibold text-primary">
+        {Number(j.finalAmount ?? j.budget ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+      </span>
+    ),
   },
   {
     key: 'status',
@@ -39,79 +46,77 @@ const JOB_COLUMNS = [
   },
 ]
 
+// Queue profiles carry `user` as an id; `account` is joined in from the worker list in load().
 const WORKER_COLUMNS = [
   {
     key: 'name',
     label: 'Worker',
     render: (w) => (
       <NameCell
-        name={w.user?.fullName || 'Worker'}
-        sub={w.user?.email || 'Registered Pro'}
-        avatarChar={w.user?.fullName?.[0] || 'W'}
+        name={w.account?.fullName || `Worker ···${String(w.user || '').slice(-6)}`}
+        sub={w.account?.email}
+        avatarChar={w.account?.fullName?.[0] || 'W'}
       />
     ),
   },
   {
     key: 'service',
-    label: 'Trade Category',
-    render: (w) => <span>{w.services?.[0]?.category?.name || 'General Trades'}</span>,
+    label: 'Trade',
+    render: (w) => <span>{w.services?.[0]?.categoryName || '—'}</span>,
   },
   {
-    key: 'rate',
-    label: 'Hourly Rate',
+    key: 'experience',
+    label: 'Experience',
     align: 'right',
-    render: (w) => <span className="font-semibold text-dark-900">${w.hourlyRate || 45}/hr</span>,
+    render: (w) => <span>{w.yearsExperience ? `${w.yearsExperience} yrs` : '—'}</span>,
   },
   {
     key: 'status',
     label: 'Status',
-    render: (w) => <StatusPill status={w.verification?.status || 'pending'} />,
+    render: (w) => <StatusPill status={w.verificationStatus} />,
   },
 ]
 
 const Dashboard = () => {
-  const [stats, setStats] = useState({
-    activeJobs: 18,
-    verifiedWorkers: 42,
-    totalClients: 128,
-    platformRevenue: 12480,
-  })
+  const [stats, setStats] = useState(null)
   const [recentJobs, setRecentJobs] = useState([])
   const [pendingWorkers, setPendingWorkers] = useState([])
+  const [error, setError] = useState(null)
 
   const load = async () => {
     try {
-      const [jobsRes, verifsRes, usersRes, settingsRes] = await Promise.all([
-        apiRequest('/admin/jobs'),
-        apiRequest('/admin/workers/verification-queue'),
-        apiRequest('/admin/users'),
+      const [jobs, queueRes, workers, clientCount, settingsRes] = await Promise.all([
+        apiRequestAll('/admin/jobs', 'jobs'),
+        apiRequest('/admin/workers/verification-queue?limit=5'),
+        apiRequestAll('/admin/users', 'users', { role: 'worker' }),
+        apiCount('/admin/users', { role: 'client' }),
         apiRequest('/settings/fees'),
       ])
 
-      const jobs = jobsRes?.data?.jobs || []
-      const verifs = verifsRes?.data?.profiles || []
-      const users = usersRes?.data?.users || []
-      const workers = users.filter((u) => u.isWorker).length
-      const clients = users.length - workers
+      // Mirrors payment.service computeFees: the platform keeps the commission on the job amount
+      // plus the priority fee. Uses today's commission rate, so it's an estimate for older jobs.
+      const feePercent = settingsRes?.data?.platformFeePercent ?? 0
+      const revenue = jobs
+        .filter((j) => PAID_JOB_STATUSES.includes(j.status))
+        .reduce((sum, j) => sum + round2(((j.finalAmount ?? j.budget ?? 0) * feePercent) / 100) + (j.priorityFee || 0), 0)
 
-      const totalEscrowVolume = jobs.reduce((sum, j) => sum + (j.finalAmount || j.budget || 0), 0)
-      const feePercent = settingsRes?.data?.platformFeePercent || 5.0
-      const revenue = (totalEscrowVolume * feePercent) / 100
+      const usersById = new Map(workers.map((u) => [u._id, u]))
+      const queue = queueRes?.data?.profiles || []
 
       setStats({
-        activeJobs: jobs.filter((j) => ['open', 'en_route', 'arrived', 'started'].includes(j.status)).length || jobs.length,
-        verifiedWorkers: workers || 42,
-        totalClients: clients || 128,
-        platformRevenue: revenue || 12480,
+        activeJobs: jobs.filter((j) => ACTIVE_JOB_STATUSES.includes(j.status)).length,
+        workers: workers.length,
+        clients: clientCount,
+        pendingVerifications: queueRes?.data?.pagination?.total ?? queue.length,
+        platformRevenue: revenue,
       })
-
       setRecentJobs(jobs.slice(0, 5))
-      setPendingWorkers(verifs.slice(0, 5))
+      setPendingWorkers(queue.map((p) => ({ ...p, account: usersById.get(p.user) || null })))
+      setError(null)
     } catch (err) {
-      console.warn('Dashboard fetch fallback:', err)
+      setError(err.message)
     }
   }
-
   useEffect(() => {
     load()
   }, [])
@@ -139,27 +144,23 @@ const Dashboard = () => {
         <StatCard
           icon={Zap}
           label="Active Jobs"
-          value={formatNumber(stats.activeJobs)}
-          change={8.4}
+          value={stats ? formatNumber(stats.activeJobs) : '—'}
           highlight={true}
         />
         <StatCard
           icon={ShieldCheck}
-          label="Verified Providers"
-          value={formatNumber(stats.verifiedWorkers)}
-          change={12.5}
+          label="Registered Workers"
+          value={stats ? formatNumber(stats.workers) : '—'}
         />
         <StatCard
           icon={Users}
           label="Registered Clients"
-          value={formatNumber(stats.totalClients)}
-          change={5.2}
+          value={stats ? formatNumber(stats.clients) : '—'}
         />
         <StatCard
           icon={DollarSign}
-          label="Platform Commission"
-          value={formatCurrency(stats.platformRevenue)}
-          change={14.8}
+          label="Est. Platform Revenue"
+          value={stats ? formatCurrency(stats.platformRevenue) : '—'}
         />
       </div>
 
@@ -168,6 +169,7 @@ const Dashboard = () => {
           title="Recent Marketplace Jobs"
           columns={JOB_COLUMNS}
           rows={recentJobs}
+          empty={error ? `Couldn't load dashboard data: ${error}` : 'No jobs posted yet.'}
           action={
             <a
               href={adminPaths.jobs}
@@ -180,10 +182,10 @@ const Dashboard = () => {
         />
 
         <AdminTable
-          title="Verification Queue"
+          title={stats ? `Verification Queue (${formatNumber(stats.pendingVerifications)})` : 'Verification Queue'}
           columns={WORKER_COLUMNS}
           rows={pendingWorkers}
-          empty="No pending worker verifications."
+          empty={error ? '—' : 'No pending worker verifications.'}
           action={
             <a
               href={adminPaths.verifications}

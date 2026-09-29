@@ -1,25 +1,39 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Eye, Check, X, ShieldCheck } from 'lucide-react'
+import { Eye, Check, X, ShieldCheck, FileWarning } from 'lucide-react'
 import { AdminHeader, AdminModal, AdminTable, AdminToolbar, NameCell, RefreshButton, StatusPill } from './AdminParts'
-import { apiRequest } from '../api/client'
+import { apiRequest, apiRequestAll } from '../api/client'
 
-const FILTERS = ['All', 'Pending', 'Approved', 'Rejected']
+const EXPERIENCE_LABELS = { beginner: 'Beginner', intermediate: 'Intermediate', expert: 'Expert' }
 
+const formatDate = (d) =>
+  d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+
+const tradeNames = (p) => (p.services || []).map((s) => s.categoryName).filter(Boolean)
+
+/**
+ * The queue endpoint returns pending profiles only, with `user` as a bare id and no ID-document
+ * files. Worker names/contact details are joined in from the admin user list.
+ */
 const Verifications = () => {
   const [profiles, setProfiles] = useState([])
   const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState('Pending')
   const [inspectProfile, setInspectProfile] = useState(null)
   const [rejectionReason, setRejectionReason] = useState('')
   const [rejecting, setRejecting] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
   const loadData = async () => {
     try {
-      const res = await apiRequest('/admin/workers/verification-queue')
-      setProfiles(res?.data?.profiles || [])
+      const [queue, workers] = await Promise.all([
+        apiRequestAll('/admin/workers/verification-queue', 'profiles'),
+        apiRequestAll('/admin/users', 'users', { role: 'worker' }),
+      ])
+      const usersById = new Map(workers.map((u) => [u._id, u]))
+      setProfiles(queue.map((p) => ({ ...p, account: usersById.get(p.user) || null })))
+      setError(null)
     } catch (err) {
-      console.warn('Queue fetch error:', err)
+      setError(err.message)
     }
   }
 
@@ -27,101 +41,92 @@ const Verifications = () => {
     loadData()
   }, [])
 
-  const handleApprove = async (workerUserId) => {
+  const closeInspect = () => {
+    setInspectProfile(null)
+    setRejecting(false)
+    setRejectionReason('')
+  }
+
+  // `workerUserId` is the worker's User id (profile.user), which is what the route expects.
+  const review = async (workerUserId, body) => {
     setLoading(true)
     try {
       await apiRequest(`/admin/workers/${workerUserId}/verification`, {
         method: 'PATCH',
-        body: JSON.stringify({ status: 'approved' }),
+        body: JSON.stringify(body),
       })
-      setInspectProfile(null)
+      closeInspect()
       loadData()
     } catch (err) {
-      alert(err.message || 'Approval failed')
+      alert(err.message || 'Review failed')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleReject = async (workerUserId) => {
+  const handleApprove = (workerUserId) => review(workerUserId, { status: 'approved' })
+
+  const handleReject = (workerUserId) => {
     if (!rejectionReason.trim()) {
       alert('Please enter a rejection reason')
       return
     }
-    setLoading(true)
-    try {
-      await apiRequest(`/admin/workers/${workerUserId}/verification`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'rejected', rejectionReason: rejectionReason.trim() }),
-      })
-      setRejecting(false)
-      setInspectProfile(null)
-      setRejectionReason('')
-      loadData()
-    } catch (err) {
-      alert(err.message || 'Rejection failed')
-    } finally {
-      setLoading(false)
-    }
+    review(workerUserId, { status: 'rejected', rejectionReason: rejectionReason.trim() })
   }
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return profiles.filter((p) => {
-      const status = p.verification?.status || 'pending'
-      const matchesFilter =
-        filter === 'All' ||
-        (filter === 'Pending' && status === 'pending') ||
-        (filter === 'Approved' && status === 'approved') ||
-        (filter === 'Rejected' && status === 'rejected')
+    if (!q) return profiles
+    return profiles.filter((p) =>
+      [p.account?.fullName, p.account?.email, p.account?.phone, ...tradeNames(p)].some((f) =>
+        (f || '').toLowerCase().includes(q),
+      ),
+    )
+  }, [profiles, query])
 
-      const name = p.user?.fullName || ''
-      const email = p.user?.email || ''
-      const category = p.services?.[0]?.category?.name || ''
-      const matchesQuery = !q || [name, email, category].some((f) => f.toLowerCase().includes(q))
-
-      return matchesFilter && matchesQuery
-    })
-  }, [profiles, query, filter])
+  const workerName = (p) => p.account?.fullName || `Worker ···${String(p.user || '').slice(-6)}`
 
   const columns = [
     {
       key: 'name',
       label: 'Worker',
       render: (p) => (
-        <NameCell
-          name={p.user?.fullName || 'Worker'}
-          sub={p.user?.email}
-          avatarChar={p.user?.fullName?.[0]}
-        />
+        <NameCell name={workerName(p)} sub={p.account?.email} avatarChar={p.account?.fullName?.[0] || 'W'} />
       ),
     },
     {
       key: 'phone',
       label: 'Phone',
-      render: (p) => <span>{p.user?.phone || '—'}</span>,
+      render: (p) => <span>{p.account?.phone || '—'}</span>,
     },
     {
-      key: 'category',
-      label: 'Trade Category',
-      render: (p) => <span>{p.services?.[0]?.category?.name || 'General Trades'}</span>,
+      key: 'trades',
+      label: 'Trades',
+      render: (p) => {
+        const trades = tradeNames(p)
+        return (
+          <span className="block max-w-[220px] truncate" title={trades.join(', ')}>
+            {trades.join(', ') || '—'}
+          </span>
+        )
+      },
     },
     {
-      key: 'hourlyRate',
-      label: 'Rate',
+      key: 'experience',
+      label: 'Experience',
       align: 'right',
-      render: (p) => <span className="font-semibold">${p.hourlyRate}/hr</span>,
+      render: (p) => <span>{p.yearsExperience ? `${p.yearsExperience} yrs` : '—'}</span>,
     },
     {
       key: 'trustScore',
       label: 'Trust Score',
       align: 'right',
-      render: (p) => <span className="font-semibold text-emerald-700">{p.trustScore || 50}</span>,
+      render: (p) => <span className="font-semibold text-emerald-700">{p.trustScore ?? '—'}</span>,
     },
     {
       key: 'status',
       label: 'Status',
-      render: (p) => <StatusPill status={p.verification?.status || 'pending'} />,
+      render: (p) => <StatusPill status={p.verificationStatus} />,
     },
     {
       key: 'actions',
@@ -130,76 +135,47 @@ const Verifications = () => {
       render: (p) => (
         <div className="admin-row-actions">
           <button type="button" className="btn btn-sm btn-outline" onClick={() => setInspectProfile(p)}>
-            <Eye strokeWidth={2} /> Inspect
+            <Eye strokeWidth={2} /> Review
           </button>
-          {p.verification?.status === 'pending' && (
-            <button
-              type="button"
-              className="btn btn-sm btn-success"
-              disabled={loading}
-              onClick={() => handleApprove(p.user?._id)}
-            >
-              <Check strokeWidth={2} /> Approve
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn btn-sm btn-success"
+            disabled={loading}
+            onClick={() => handleApprove(p.user)}
+          >
+            <Check strokeWidth={2} /> Approve
+          </button>
         </div>
       ),
     },
   ]
-
-  const closeInspect = () => {
-    setInspectProfile(null)
-    setRejecting(false)
-    setRejectionReason('')
-  }
-
-  const pendingCount = profiles.filter((p) => (p.verification?.status || 'pending') === 'pending').length
-
-  const documents = inspectProfile
-    ? [
-        { label: 'ID Front', file: inspectProfile.verification?.idFrontFile, missing: 'No file' },
-        { label: 'ID Back', file: inspectProfile.verification?.idBackFile, missing: 'Not applicable' },
-        { label: 'Identity Selfie', file: inspectProfile.verification?.selfieFile, missing: 'No file' },
-      ]
-    : []
 
   return (
     <div className="admin-page">
       <AdminHeader
         title="Verification Queue"
         count={profiles.length}
-        subtitle={`${pendingCount} awaiting review. Verify identity credentials to issue verified trust badges.`}
+        subtitle="Workers awaiting identity review, oldest first. Approving grants the verified badge and +20 trust score."
         actions={<RefreshButton onRefresh={loadData} />}
       />
 
       <AdminToolbar
         query={query}
         onQuery={setQuery}
-        placeholder="Search worker name, email or trade"
-        filters={FILTERS}
-        filter={filter}
-        onFilter={setFilter}
-        filterLabel="Filter by status"
+        placeholder="Search worker name, email, phone or trade"
       />
 
       <AdminTable
         columns={columns}
         rows={rows}
-        empty="No verification requests match your filter."
+        empty={error ? `Couldn't load the verification queue: ${error}` : 'No workers are waiting for verification.'}
       />
 
       {inspectProfile && (
         <AdminModal
           size="max-w-2xl"
-          title={`Verify credentials: ${inspectProfile.user?.fullName || 'Worker'}`}
-          subtitle={
-            <>
-              ID type:{' '}
-              <span className="font-semibold uppercase">
-                {inspectProfile.verification?.idType || 'Government ID'}
-              </span>
-            </>
-          }
+          title={`Review ${workerName(inspectProfile)}`}
+          subtitle={[inspectProfile.account?.email, inspectProfile.account?.phone].filter(Boolean).join(' · ') || undefined}
           onClose={closeInspect}
           footer={
             rejecting ? (
@@ -211,7 +187,7 @@ const Verifications = () => {
                   type="button"
                   className="btn btn-danger-solid"
                   disabled={loading}
-                  onClick={() => handleReject(inspectProfile.user?._id)}
+                  onClick={() => handleReject(inspectProfile.user)}
                 >
                   <X strokeWidth={2} /> Confirm rejection
                 </button>
@@ -228,7 +204,7 @@ const Verifications = () => {
                   type="button"
                   className="btn btn-primary"
                   disabled={loading}
-                  onClick={() => handleApprove(inspectProfile.user?._id)}
+                  onClick={() => handleApprove(inspectProfile.user)}
                 >
                   <ShieldCheck strokeWidth={2} /> Approve &amp; grant badge
                 </button>
@@ -236,24 +212,54 @@ const Verifications = () => {
             )
           }
         >
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {documents.map(({ label, file, missing }, i) => (
-              <div key={label} className="flex flex-col gap-1.5">
-                <span className="text-[12px] font-semibold text-muted">
-                  {i + 1}. {label}
-                </span>
-                <div className="aspect-[4/3] rounded-xl bg-surface border border-line overflow-hidden flex items-center justify-center">
-                  {file?.url ? (
-                    <a href={file.url} target="_blank" rel="noreferrer" className="size-full">
-                      <img src={file.url} alt={label} className="size-full object-cover" />
-                    </a>
-                  ) : (
-                    <span className="text-[12px] text-muted">{missing}</span>
-                  )}
-                </div>
+          <div className="flex items-start gap-2.5 rounded-[14px] border border-amber-200 bg-amber-50 p-3.5 text-[13px] text-amber-800">
+            <FileWarning className="size-4 shrink-0 mt-0.5" />
+            <p>
+              ID front, back and selfie images aren&apos;t included in the verification queue response, so they
+              can&apos;t be shown here yet.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              ['Experience', inspectProfile.yearsExperience ? `${inspectProfile.yearsExperience} yrs` : '—'],
+              ['Trust score', inspectProfile.trustScore ?? '—'],
+              ['Rating', inspectProfile.ratingCount ? `${inspectProfile.ratingAvg} (${inspectProfile.ratingCount})` : '—'],
+              ['Jobs completed', inspectProfile.jobsCompleted ?? 0],
+            ].map(([label, value]) => (
+              <div key={label} className="admin-info-box">
+                <p className="admin-info-label">{label}</p>
+                <p className="font-semibold text-dark-900 tabular-nums">{value}</p>
               </div>
             ))}
           </div>
+
+          <div className="admin-info-box">
+            <p className="admin-info-label">Trades</p>
+            {inspectProfile.services?.length ? (
+              <ul className="mt-1 flex flex-wrap gap-1.5">
+                {inspectProfile.services.map((s, i) => (
+                  <li key={s.category || i} className="admin-badge">
+                    {s.categoryName || 'Unknown trade'}
+                    {s.experienceLevel && (
+                      <span className="font-normal opacity-75">· {EXPERIENCE_LABELS[s.experienceLevel] || s.experienceLevel}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted">No trades listed</p>
+            )}
+          </div>
+
+          {inspectProfile.bio && (
+            <div className="admin-info-box bg-surface leading-relaxed text-dark-900">
+              <p className="admin-info-label">Bio</p>
+              {inspectProfile.bio}
+            </div>
+          )}
+
+          <p className="text-[12px] text-muted">Profile created {formatDate(inspectProfile.createdAt)}</p>
 
           {rejecting && (
             <label className="flex flex-col gap-1.5">
@@ -266,6 +272,7 @@ const Verifications = () => {
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
               />
+              <span className="text-[12px] text-muted">Sent to the worker in their notification.</span>
             </label>
           )}
         </AdminModal>

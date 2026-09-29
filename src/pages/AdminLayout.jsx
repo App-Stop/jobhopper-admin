@@ -7,11 +7,9 @@ import {
   Tag,
   SlidersHorizontal,
   LogOut,
-  ExternalLink,
 } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { adminLinkClick, adminPaths } from '../navigation'
-import { MARKETPLACE_URL } from '../config'
 
 const NAV = [
   { page: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -48,16 +46,6 @@ const AdminLayout = ({ page, session, onLogout, children }) => (
           </a>
         ))}
       </nav>
-
-      <a
-        href={MARKETPLACE_URL}
-        target="_blank"
-        rel="noreferrer"
-        className="admin-nav-link hidden lg:flex"
-      >
-        <ExternalLink strokeWidth={1.5} />
-        <span>View marketplace</span>
-      </a>
 
       <div className="admin-account">
         <span className="admin-avatar" aria-hidden="true">

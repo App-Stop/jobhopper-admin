@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Lock, Sparkles } from 'lucide-react'
+import { Lock } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { adminLogin } from '../services/adminAuth'
 
@@ -20,12 +20,6 @@ const AdminLogin = ({ onLogin }) => {
       setError(err.message || 'Incorrect email or password')
       setLoading(false)
     }
-  }
-
-  const fillDemo = () => {
-    setEmail('admin@jobhopper.com')
-    setPassword('AdminPassword123!')
-    setError('')
   }
 
   return (
@@ -76,15 +70,6 @@ const AdminLogin = ({ onLogin }) => {
 
         <button type="submit" className="modal-btn modal-btn-primary" disabled={loading}>
           {loading ? 'Signing in…' : 'Sign in to Console'}
-        </button>
-
-        <button
-          type="button"
-          onClick={fillDemo}
-          className="modal-btn modal-btn-outline gap-2 text-[14px]"
-        >
-          <Sparkles className="size-4 text-accent" />
-          Use Demo Credentials
         </button>
       </form>
     </main>

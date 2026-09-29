@@ -487,6 +487,10 @@
   @apply border-l border-line;
 }
 
+.admin-unit-input:has(input:disabled) {
+  @apply bg-surface opacity-60 cursor-not-allowed;
+}
+
 .admin-unit-input--changed {
   @apply border-amber-300 bg-amber-50/40;
 }

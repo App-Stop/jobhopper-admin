@@ -10,6 +10,7 @@ import Categories from './pages/Categories'
 import Settings from './pages/Settings'
 import { adminLogout, getAdminSession } from './services/adminAuth'
 import { currentAdminPage } from './navigation'
+import { UNAUTHORIZED_EVENT } from './api/client'
 import './pages/admin.css'
 
 const App = () => {
@@ -23,6 +24,13 @@ const App = () => {
     }
     window.addEventListener('popstate', handleChange)
     return () => window.removeEventListener('popstate', handleChange)
+  }, [])
+
+  // The API client clears the stored token on a 401; drop back to the login screen.
+  useEffect(() => {
+    const handleUnauthorized = () => setSession(null)
+    window.addEventListener(UNAUTHORIZED_EVENT, handleUnauthorized)
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, handleUnauthorized)
   }, [])
 
   if (!session) return <AdminLogin onLogin={setSession} />

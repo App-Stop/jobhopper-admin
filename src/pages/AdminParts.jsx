@@ -49,19 +49,21 @@ export const AdminToolbar = ({ query, onQuery, placeholder, filters, filter, onF
         onChange={(e) => onQuery(e.target.value)}
       />
     </label>
-    <div className="admin-filters" role="group" aria-label={filterLabel}>
-      {filters.map((f) => (
-        <button
-          key={f}
-          type="button"
-          aria-pressed={filter === f}
-          className="admin-filter"
-          onClick={() => onFilter(f)}
-        >
-          {f}
-        </button>
-      ))}
-    </div>
+    {filters && (
+      <div className="admin-filters" role="group" aria-label={filterLabel}>
+        {filters.map((f) => (
+          <button
+            key={f}
+            type="button"
+            aria-pressed={filter === f}
+            className="admin-filter"
+            onClick={() => onFilter(f)}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+    )}
   </div>
 )
 
@@ -137,6 +139,8 @@ const STATUS_CONFIG = {
   inactive: { label: 'Inactive', modifier: 'inactive' },
   deactivated: { label: 'Deactivated', modifier: 'suspended' },
   suspended: { label: 'Suspended', modifier: 'suspended' },
+  not_submitted: { label: 'Not Submitted', modifier: 'inactive' },
+  under_review: { label: 'Under Review', modifier: 'pending' },
   resolved: { label: 'Resolved', modifier: 'active' },
   dismissed: { label: 'Dismissed', modifier: 'inactive' },
 }

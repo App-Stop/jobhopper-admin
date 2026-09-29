@@ -1,9 +1,25 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Gavel, Pencil } from 'lucide-react'
 import { AdminHeader, AdminModal, AdminTable, AdminToolbar, NameCell, RefreshButton, StatusPill } from './AdminParts'
-import { apiRequest } from '../api/client'
+import { apiRequest, apiRequestAll } from '../api/client'
 
-const FILTERS = ['All', 'Pending', 'Resolved', 'Dismissed']
+// Backend report statuses: open → under_review → resolved | dismissed.
+const FILTER_STATUSES = {
+  Open: 'open',
+  'Under Review': 'under_review',
+  Resolved: 'resolved',
+  Dismissed: 'dismissed',
+}
+const FILTERS = ['All', ...Object.keys(FILTER_STATUSES)]
+
+const DECISIONS = [
+  { status: 'under_review', label: 'Under review' },
+  { status: 'resolved', label: 'Resolve (accept claim)' },
+  { status: 'dismissed', label: 'Dismiss (reject claim)' },
+]
+
+const formatDate = (d) =>
+  d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
 const Disputes = () => {
   const [reports, setReports] = useState([])
@@ -13,13 +29,20 @@ const Disputes = () => {
   const [resolutionStatus, setResolutionStatus] = useState('resolved')
   const [resolutionNote, setResolutionNote] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
+  // Reports only carry the job id, so admin jobs are loaded alongside to show the job code and parties.
   const loadReports = async () => {
     try {
-      const res = await apiRequest('/reports')
-      setReports(res?.data?.reports || [])
+      const [list, jobs] = await Promise.all([
+        apiRequestAll('/reports', 'reports'),
+        apiRequestAll('/admin/jobs', 'jobs'),
+      ])
+      const jobsById = new Map(jobs.map((j) => [j._id, j]))
+      setReports(list.map((r) => ({ ...r, jobInfo: jobsById.get(r.job) || null })))
+      setError(null)
     } catch (err) {
-      console.warn('Failed to load reports:', err)
+      setError(err.message)
     }
   }
 
@@ -29,29 +52,27 @@ const Disputes = () => {
 
   const handleOpenResolve = (rep) => {
     setSelectedReport(rep)
-    setResolutionStatus(rep.status === 'dismissed' ? 'dismissed' : 'resolved')
+    setResolutionStatus(rep.status === 'open' ? 'resolved' : rep.status)
     setResolutionNote(rep.resolutionNote || '')
   }
 
+  const noteRequired = resolutionStatus !== 'under_review'
+
   const handleConfirmResolve = async (e) => {
     e.preventDefault()
-    if (!resolutionNote.trim()) {
-      alert('Please enter an administrative resolution note')
-      return
-    }
     setLoading(true)
     try {
       await apiRequest(`/reports/${selectedReport._id}`, {
         method: 'PATCH',
         body: JSON.stringify({
           status: resolutionStatus,
-          resolutionNote: resolutionNote.trim(),
+          ...(resolutionNote.trim() ? { resolutionNote: resolutionNote.trim() } : {}),
         }),
       })
       setSelectedReport(null)
       loadReports()
     } catch (err) {
-      alert(err.message || 'Resolution failed')
+      alert(err.message || 'Update failed')
     } finally {
       setLoading(false)
     }
@@ -60,15 +81,16 @@ const Disputes = () => {
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
     return reports.filter((r) => {
-      let matchesFilter = true
-      if (filter === 'Pending') matchesFilter = r.status === 'pending'
-      else if (filter === 'Resolved') matchesFilter = r.status === 'resolved'
-      else if (filter === 'Dismissed') matchesFilter = r.status === 'dismissed'
+      const matchesFilter = filter === 'All' || r.status === FILTER_STATUSES[filter]
 
-      const reason = r.reason || ''
-      const reporter = r.reportedBy?.fullName || ''
-      const jobCode = r.job?.jobCode || ''
-      const matchesQuery = !q || [reason, reporter, jobCode].some((f) => f.toLowerCase().includes(q))
+      const fields = [
+        r.reason,
+        r.description,
+        r.jobInfo?.jobCode,
+        r.jobInfo?.client?.fullName,
+        r.jobInfo?.worker?.fullName,
+      ]
+      const matchesQuery = !q || fields.some((f) => (f || '').toLowerCase().includes(q))
 
       return matchesFilter && matchesQuery
     })
@@ -78,38 +100,32 @@ const Disputes = () => {
     {
       key: 'reason',
       label: 'Complaint / Reason',
-      render: (r) => (
-        <NameCell
-          name={r.reason}
-          sub={r.description}
-          avatarChar="!"
-        />
-      ),
-    },
-    {
-      key: 'reporter',
-      label: 'Reported By',
-      render: (r) => <span className="admin-cell-strong">{r.reportedBy?.fullName || 'User'}</span>,
+      render: (r) => <NameCell name={r.reason || 'Report'} sub={r.description} avatarChar="!" />,
     },
     {
       key: 'job',
-      label: 'Job Reference',
+      label: 'Job',
       render: (r) => (
-        <span className="font-semibold text-primary">
-          {r.job?.jobCode || 'Job Order'}
-        </span>
+        <div>
+          <p className="font-semibold text-primary">{r.jobInfo?.jobCode || '—'}</p>
+          {r.jobInfo?.title && <p className="admin-cell-sub max-w-[220px] truncate">{r.jobInfo.title}</p>}
+        </div>
+      ),
+    },
+    {
+      key: 'parties',
+      label: 'Client / Worker',
+      render: (r) => (
+        <div>
+          <p className="admin-cell-strong">{r.jobInfo?.client?.fullName || '—'}</p>
+          <p className="admin-cell-sub">{r.jobInfo?.worker?.fullName || 'No worker assigned'}</p>
+        </div>
       ),
     },
     {
       key: 'date',
-      label: 'Reported Date',
-      render: (r) => (
-        <span>
-          {r.createdAt
-            ? new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-            : '—'}
-        </span>
-      ),
+      label: 'Reported',
+      render: (r) => <span>{formatDate(r.createdAt)}</span>,
     },
     {
       key: 'status',
@@ -122,13 +138,13 @@ const Disputes = () => {
       align: 'right',
       render: (r) => (
         <div className="admin-row-actions">
-          {r.status === 'pending' ? (
+          {r.status === 'open' || r.status === 'under_review' ? (
             <button type="button" className="btn btn-sm btn-primary" onClick={() => handleOpenResolve(r)}>
               <Gavel strokeWidth={2} /> Take action
             </button>
           ) : (
             <button type="button" className="btn btn-sm btn-outline" onClick={() => handleOpenResolve(r)}>
-              <Pencil strokeWidth={2} /> Edit note
+              <Pencil strokeWidth={2} /> Edit decision
             </button>
           )}
         </div>
@@ -136,21 +152,21 @@ const Disputes = () => {
     },
   ]
 
-  const pendingCount = reports.filter((r) => r.status === 'pending').length
+  const openCount = reports.filter((r) => r.status === 'open' || r.status === 'under_review').length
 
   return (
     <div className="admin-page">
       <AdminHeader
         title="Disputes & Reports"
         count={reports.length}
-        subtitle={`${pendingCount} claims awaiting arbitration. Review conflict details and record administrative resolutions.`}
+        subtitle={`${openCount} claims awaiting a decision. Review conflict details and record administrative resolutions.`}
         actions={<RefreshButton onRefresh={loadReports} />}
       />
 
       <AdminToolbar
         query={query}
         onQuery={setQuery}
-        placeholder="Search claim, user or job code"
+        placeholder="Search reason, job code, client or worker"
         filters={FILTERS}
         filter={filter}
         onFilter={setFilter}
@@ -160,7 +176,7 @@ const Disputes = () => {
       <AdminTable
         columns={columns}
         rows={rows}
-        empty="No dispute reports match your filter."
+        empty={error ? `Couldn't load reports: ${error}` : 'No dispute reports match your filter.'}
       />
 
       {selectedReport && (
@@ -168,7 +184,7 @@ const Disputes = () => {
           as="form"
           onSubmit={handleConfirmResolve}
           title="Arbitrate claim"
-          subtitle={`Job #${selectedReport.job?.jobCode || '—'} · reported by ${selectedReport.reportedBy?.fullName || 'User'}`}
+          subtitle={`Job ${selectedReport.jobInfo?.jobCode || '—'} · reported ${formatDate(selectedReport.createdAt)}`}
           onClose={() => setSelectedReport(null)}
           footer={
             <>
@@ -176,7 +192,7 @@ const Disputes = () => {
                 Cancel
               </button>
               <button type="submit" className="btn btn-primary" disabled={loading}>
-                {loading ? 'Saving…' : 'Confirm resolution'}
+                {loading ? 'Saving…' : 'Save decision'}
               </button>
             </>
           }
@@ -189,37 +205,50 @@ const Disputes = () => {
             )}
           </div>
 
+          {selectedReport.jobInfo && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="admin-info-box">
+                <p className="admin-info-label">Client</p>
+                <p className="font-semibold text-dark-900">{selectedReport.jobInfo.client?.fullName || '—'}</p>
+              </div>
+              <div className="admin-info-box">
+                <p className="admin-info-label">Worker</p>
+                <p className="font-semibold text-dark-900">{selectedReport.jobInfo.worker?.fullName || 'Unassigned'}</p>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col gap-1.5">
             <span className="admin-field-label">Decision</span>
             <div className="admin-filters w-full" role="group" aria-label="Decision">
-              <button
-                type="button"
-                aria-pressed={resolutionStatus === 'resolved'}
-                className="admin-filter flex-1"
-                onClick={() => setResolutionStatus('resolved')}
-              >
-                Resolve (accept claim)
-              </button>
-              <button
-                type="button"
-                aria-pressed={resolutionStatus === 'dismissed'}
-                className="admin-filter flex-1"
-                onClick={() => setResolutionStatus('dismissed')}
-              >
-                Dismiss (reject claim)
-              </button>
+              {DECISIONS.map(({ status, label }) => (
+                <button
+                  key={status}
+                  type="button"
+                  aria-pressed={resolutionStatus === status}
+                  className="admin-filter flex-1"
+                  onClick={() => setResolutionStatus(status)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
+            {resolutionStatus !== 'under_review' && (
+              <p className="text-[12px] text-muted">The reporter is notified when a claim is resolved or dismissed.</p>
+            )}
           </div>
 
           <label className="flex flex-col gap-1.5">
-            <span className="admin-field-label">Resolution note</span>
+            <span className="admin-field-label">
+              Resolution note{!noteRequired && <span className="font-normal text-muted"> (optional)</span>}
+            </span>
             <textarea
               rows={4}
               className="admin-textarea"
               placeholder="Explain the verdict for both customer and tradesperson…"
               value={resolutionNote}
               onChange={(e) => setResolutionNote(e.target.value)}
-              required
+              required={noteRequired}
             />
           </label>
         </AdminModal>
