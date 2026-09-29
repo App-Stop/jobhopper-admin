@@ -1,0 +1,154 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import 'tailwindcss';
+
+/*
+ * No manual `* { margin: 0; padding: 0 }` reset here: Tailwind's preflight already does it
+ * inside the `base` layer. An unlayered reset would beat every layered class below.
+ */
+
+/* JobHopper theme — adapted from cozy-admin architecture */
+@theme {
+  --color-primary: #1e3a5f;
+  --color-primary-dark: #12253e;
+  --color-primary-light: #e7f1ff;
+  --color-accent: #10b981;
+  --color-accent-light: #e2fff5;
+  --color-dark-900: #111111;
+  --color-muted: #64748b;
+  --color-muted-light: #94a3b8;
+  --color-line: #e2e8f0;
+  --color-line-strong: #cbd5e1;
+  --color-surface: #f8fafc;
+  --color-subtle: #94a3b8;
+  --color-placeholder: #94a3b8;
+  --font-primary: 'Inter', sans-serif;
+}
+
+@layer base {
+  body {
+    @apply font-primary text-dark-900 bg-surface;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/*
+ * Component classes live in the `components` layer so utility classes in markup
+ * (e.g. `w-auto`, `sm:flex-row`) can override them. Unlayered CSS would beat utilities.
+ */
+@layer components {
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 h-10 px-4 shrink-0 rounded-full border border-transparent
+         text-[14px] leading-none font-semibold whitespace-nowrap no-underline cursor-pointer select-none
+         transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30
+         disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn svg {
+  @apply size-4 shrink-0;
+}
+
+.btn-sm {
+  @apply h-8 px-3 gap-1.5 text-[12.5px];
+}
+
+.btn-sm svg {
+  @apply size-3.5;
+}
+
+.btn-icon {
+  @apply w-10 px-0;
+}
+
+.btn-sm.btn-icon {
+  @apply w-8;
+}
+
+.btn-primary {
+  @apply bg-primary text-white enabled:hover:bg-primary-dark;
+}
+
+.btn-outline {
+  @apply bg-white border-line text-dark-900 enabled:hover:bg-surface enabled:hover:border-line-strong;
+}
+
+.btn-ghost {
+  @apply bg-transparent text-muted enabled:hover:bg-primary-light enabled:hover:text-primary;
+}
+
+.btn-success {
+  @apply bg-white border-emerald-200 text-emerald-700 enabled:hover:bg-emerald-50;
+}
+
+.btn-danger {
+  @apply bg-white border-rose-200 text-rose-600 enabled:hover:bg-rose-50;
+}
+
+.btn-danger-solid {
+  @apply bg-rose-600 text-white enabled:hover:bg-rose-700;
+}
+
+/* ---------- Forms (Cozy modal inputs adapted for JobHopper) ---------- */
+
+.modal-heading {
+  @apply flex flex-col items-start justify-center gap-1;
+}
+
+.modal-title {
+  @apply text-[24px] leading-normal font-semibold text-dark-900;
+}
+
+.modal-hint {
+  @apply text-[14px] leading-normal text-muted;
+}
+
+.modal-error {
+  @apply mt-2 text-[12px] leading-normal text-rose-600;
+}
+
+.modal-fields {
+  @apply flex flex-col gap-[10px];
+}
+
+.modal-field {
+  @apply relative flex flex-col gap-[8px] pt-[10px] pb-[12px] px-[16px] bg-white rounded-[18px]
+         border border-line cursor-text transition-colors
+         focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary;
+}
+
+.modal-field-label {
+  @apply text-[12px] leading-normal font-medium text-muted;
+}
+
+.modal-field-input {
+  @apply w-full min-w-0 p-0 bg-transparent border-0 outline-none text-[15px] leading-normal text-dark-900
+         placeholder:text-placeholder;
+}
+
+.modal-btn {
+  @apply flex items-center justify-center w-full h-[50px] shrink-0 px-5 rounded-full border-0
+         text-[15px] leading-normal font-semibold cursor-pointer transition-colors
+         disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.modal-btn-primary {
+  @apply bg-primary text-white enabled:hover:bg-primary-dark;
+}
+
+.modal-btn-accent {
+  @apply bg-accent text-white enabled:hover:bg-emerald-600;
+}
+
+.modal-btn-outline {
+  @apply bg-white border border-line text-dark-900 enabled:hover:bg-primary-light;
+}
+
+.modal-field-textarea {
+  @apply w-full min-w-0 p-0 bg-transparent border-0 outline-none resize-none text-[15px] leading-relaxed
+         text-dark-900 placeholder:text-placeholder;
+}
+
+} /* @layer components */

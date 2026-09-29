@@ -1,0 +1,542 @@
+@reference '../index.css';
+
+/* See index.css: keep these in the components layer so markup utilities can override them. */
+@layer components {
+
+/* ---------- Admin: login ---------- */
+
+.admin-login {
+  @apply relative flex items-center justify-center min-h-screen px-4 py-10 overflow-hidden bg-surface text-dark-900;
+}
+
+/* JobHopper navy/green subtle atmospheric glow */
+.admin-login-glow {
+  @apply absolute -top-40 left-0 w-full h-80 pointer-events-none
+         bg-[radial-gradient(60%_100%_at_70%_100%,rgba(30,58,95,0.25),transparent_70%),radial-gradient(40%_100%_at_15%_100%,rgba(16,185,129,0.20),transparent_70%)]
+         blur-2xl;
+}
+
+.admin-login-card {
+  @apply relative flex flex-col gap-[28px] w-full max-w-[440px] p-6 sm:p-10 bg-white rounded-[28px]
+         border border-line;
+}
+
+.admin-login-head {
+  @apply flex items-center justify-between;
+}
+
+.admin-logo {
+  @apply block h-8 w-auto object-contain;
+}
+
+.admin-login-head .admin-logo {
+  @apply box-content px-3 py-2 rounded-[14px] bg-primary brightness-0 invert;
+}
+
+.admin-badge {
+  @apply inline-flex items-center gap-1.5 px-[10px] py-1 rounded-full bg-primary-light
+         text-[12px] leading-normal font-semibold text-primary whitespace-nowrap;
+}
+
+.admin-badge svg {
+  @apply size-3.5;
+}
+
+.admin-badge--accent {
+  @apply bg-accent-light text-emerald-700;
+}
+
+/* ---------- Admin: shell ---------- */
+
+.admin-shell {
+  @apply flex flex-col lg:flex-row min-h-screen bg-surface text-dark-900;
+}
+
+.admin-sidebar {
+  @apply flex lg:flex-col items-center lg:items-stretch gap-3 lg:gap-8 px-4 py-3 lg:p-6
+         lg:w-[260px] lg:shrink-0 lg:h-screen lg:sticky lg:top-0 bg-primary text-white;
+}
+
+.admin-brand {
+  @apply flex items-center gap-2.5 shrink-0 no-underline;
+}
+
+.admin-logo--sidebar {
+  @apply h-8 lg:h-9 object-contain brightness-0 invert;
+}
+
+.admin-nav {
+  @apply flex lg:flex-col gap-1 lg:flex-1 overflow-x-auto lg:overflow-visible;
+}
+
+.admin-nav-link {
+  @apply flex items-center gap-3 px-3 lg:px-4 py-2 lg:py-2.5 rounded-full no-underline
+         text-[13px] lg:text-[15px] leading-normal font-medium text-white/75
+         hover:bg-white/10 hover:text-white transition-colors whitespace-nowrap;
+}
+
+.admin-nav-link svg {
+  @apply size-4.5 shrink-0;
+}
+
+/* Active item mirrors cozy-admin's solid white button */
+.admin-nav-link[aria-current='page'] {
+  @apply bg-white font-semibold text-primary hover:bg-white hover:text-primary;
+}
+
+.admin-account {
+  @apply flex items-center gap-3 ml-auto lg:ml-0 lg:pt-4 lg:border-t border-white/20;
+}
+
+.admin-sidebar .admin-avatar {
+  @apply bg-white/15 text-white;
+}
+
+.admin-sidebar .admin-account-email {
+  @apply text-white/70;
+}
+
+.admin-sidebar .admin-icon-btn {
+  @apply bg-transparent border-white/40 text-white hover:bg-white/10 hover:text-white;
+}
+
+.admin-account-text {
+  @apply hidden lg:block flex-1 min-w-0;
+}
+
+.admin-account-name {
+  @apply text-[14px] leading-normal font-semibold capitalize truncate;
+}
+
+.admin-account-email {
+  @apply text-[12px] leading-normal text-muted truncate;
+}
+
+.admin-avatar {
+  @apply hidden lg:flex items-center justify-center size-10 shrink-0 rounded-full bg-primary-light
+         text-[15px] font-semibold text-primary uppercase;
+}
+
+.admin-avatar--sm {
+  @apply flex size-9 text-[13px];
+}
+
+.admin-icon-btn {
+  @apply flex items-center justify-center size-9 shrink-0 rounded-full bg-white border border-line
+         text-muted cursor-pointer hover:bg-primary-light hover:text-primary transition-colors;
+}
+
+.admin-icon-btn svg {
+  @apply size-4.5;
+}
+
+.admin-main {
+  @apply flex-1 min-w-0 px-4 sm:px-6 lg:px-10 py-6 lg:py-10;
+}
+
+.admin-page {
+  @apply flex flex-col gap-6 max-w-[1400px] mx-auto;
+}
+
+/* ---------- Admin: page header ---------- */
+
+.admin-header {
+  @apply flex flex-col md:flex-row md:items-end md:justify-between gap-4 pb-6 border-b border-line;
+}
+
+.admin-header-text {
+  @apply flex flex-col gap-1.5 min-w-0;
+}
+
+.admin-title {
+  @apply flex flex-wrap items-center gap-x-3 gap-y-1 text-[24px] sm:text-[28px] leading-tight font-semibold
+         tracking-tight text-dark-900;
+}
+
+.admin-title-count {
+  @apply inline-flex items-center h-7 px-2.5 rounded-full bg-white border border-line
+         text-[13px] font-semibold tracking-normal tabular-nums text-muted;
+}
+
+.admin-subtitle {
+  @apply max-w-[640px] text-[14.5px] leading-relaxed text-muted;
+}
+
+.admin-header-actions {
+  @apply flex flex-wrap items-center gap-2 md:justify-end md:shrink-0;
+}
+
+/* ---------- Admin: stat cards ---------- */
+
+.admin-stats {
+  @apply grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4;
+}
+
+.admin-stat {
+  @apply flex flex-col gap-2 p-5 bg-white rounded-[20px] border border-line transition-colors;
+}
+
+.admin-stat-top {
+  @apply flex items-center justify-between gap-3;
+}
+
+.admin-stat-label {
+  @apply text-[14px] leading-normal font-medium text-muted;
+}
+
+.admin-stat-icon {
+  @apply flex items-center justify-center size-10 shrink-0 rounded-full bg-primary-light text-primary;
+}
+
+.admin-stat-icon svg {
+  @apply size-5;
+}
+
+.admin-stat-value {
+  @apply text-[28px] leading-tight font-bold tabular-nums text-dark-900;
+}
+
+.admin-trend {
+  @apply flex items-center gap-1 text-[13px] leading-normal font-semibold;
+}
+
+.admin-trend svg {
+  @apply size-4;
+}
+
+.admin-trend span {
+  @apply font-normal text-muted;
+}
+
+.admin-trend--up {
+  @apply text-emerald-600;
+}
+
+.admin-trend--down {
+  @apply text-rose-600;
+}
+
+/* Lead card painted primary (JobHopper Navy) */
+.admin-stat--primary {
+  @apply bg-primary text-white border-primary;
+}
+
+.admin-stat--primary .admin-stat-value {
+  @apply text-white;
+}
+
+.admin-stat--primary .admin-stat-label,
+.admin-stat--primary .admin-trend,
+.admin-stat--primary .admin-trend span {
+  @apply text-white/85;
+}
+
+.admin-stat--primary .admin-stat-icon {
+  @apply bg-white/20 text-white;
+}
+
+/* ---------- Admin: cards & tables ---------- */
+
+.admin-grid {
+  @apply grid grid-cols-1 xl:grid-cols-2 gap-6 items-start;
+}
+
+.admin-card {
+  @apply flex flex-col min-w-0 bg-white rounded-[20px] border border-line overflow-hidden;
+}
+
+.admin-card-head {
+  @apply flex items-center justify-between gap-4 min-h-[60px] px-5 py-3 border-b border-line;
+}
+
+.admin-card-title {
+  @apply text-[16px] leading-normal font-semibold text-dark-900;
+}
+
+.admin-card-hint {
+  @apply text-[13px] leading-normal text-muted;
+}
+
+.admin-link {
+  @apply flex items-center gap-1 text-[14px] font-medium text-primary no-underline hover:underline cursor-pointer whitespace-nowrap;
+}
+
+.admin-link svg {
+  @apply size-4;
+}
+
+.admin-table-wrap {
+  @apply overflow-x-auto;
+}
+
+.admin-table {
+  @apply w-full border-collapse text-[14px] leading-normal;
+}
+
+.admin-table th {
+  @apply h-11 px-5 bg-surface text-left text-[11.5px] font-semibold uppercase tracking-wider text-muted whitespace-nowrap;
+}
+
+.admin-table td {
+  @apply px-5 py-3.5 border-t border-line whitespace-nowrap tabular-nums align-middle;
+}
+
+.admin-table th.text-right,
+.admin-table td.text-right {
+  @apply text-right;
+}
+
+.admin-table tbody tr {
+  @apply hover:bg-primary-light/40 transition-colors;
+}
+
+.admin-table-empty {
+  @apply py-12 text-center text-muted;
+}
+
+.admin-name-cell {
+  @apply flex items-center gap-3;
+}
+
+.admin-cell-strong {
+  @apply font-semibold text-dark-900;
+}
+
+.admin-cell-sub {
+  @apply text-[12px] text-muted;
+}
+
+.admin-status {
+  @apply inline-flex items-center gap-1.5 px-[10px] py-[2px] rounded-full border border-transparent
+         text-[12px] leading-normal font-semibold whitespace-nowrap;
+}
+
+.admin-status::before {
+  @apply content-[''] size-1.5 rounded-full bg-current;
+}
+
+.admin-status--active {
+  @apply bg-emerald-50 text-emerald-700 border-emerald-200/60;
+}
+
+.admin-status--pending {
+  @apply bg-amber-50 text-amber-700 border-amber-200/60;
+}
+
+.admin-status--inactive {
+  @apply bg-slate-100 text-slate-600;
+}
+
+.admin-status--suspended {
+  @apply bg-rose-50 text-rose-700 border-rose-200/60;
+}
+
+.admin-rating {
+  @apply inline-flex items-center gap-1 font-medium text-dark-900;
+}
+
+.admin-rating svg {
+  @apply size-3.5 fill-amber-400 text-amber-400;
+}
+
+/* Row-level actions: right-aligned group of `.btn.btn-sm` buttons */
+.admin-row-actions {
+  @apply inline-flex items-center justify-end gap-2;
+}
+
+/* ---------- Admin: toolbar ---------- */
+
+.admin-toolbar {
+  @apply flex flex-col lg:flex-row lg:items-center justify-between gap-3;
+}
+
+.admin-search {
+  @apply flex items-center gap-2 w-full lg:max-w-[360px] h-10 px-4 bg-white rounded-full cursor-text
+         border border-line focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary;
+}
+
+.admin-search svg {
+  @apply size-4.5 shrink-0 text-muted;
+}
+
+.admin-search input {
+  @apply flex-1 min-w-0 bg-transparent border-0 outline-none text-[14px] text-dark-900 placeholder:text-placeholder;
+}
+
+/* Segmented control */
+.admin-filters {
+  @apply inline-flex max-w-full items-center gap-1 p-1 bg-white rounded-full border border-line overflow-x-auto;
+}
+
+.admin-filter {
+  @apply h-8 px-3.5 rounded-full border-0 bg-transparent text-[13px] leading-none font-medium text-muted
+         whitespace-nowrap cursor-pointer hover:text-primary hover:bg-primary-light transition-colors;
+}
+
+.admin-filter[aria-pressed='true'] {
+  @apply bg-primary text-white hover:bg-primary hover:text-white;
+}
+
+/* ---------- Admin: modal ---------- */
+
+.admin-modal-backdrop {
+  @apply fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary-dark/60 backdrop-blur-xs;
+}
+
+.admin-modal {
+  @apply flex flex-col w-full max-h-[90vh] bg-white rounded-[24px] border border-line overflow-hidden;
+}
+
+.admin-modal-head {
+  @apply flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-line;
+}
+
+.admin-modal-title {
+  @apply text-[18px] leading-snug font-semibold text-dark-900;
+}
+
+.admin-modal-subtitle {
+  @apply mt-0.5 text-[13px] leading-normal text-muted;
+}
+
+.admin-modal-body {
+  @apply flex flex-col gap-4 px-6 py-5 overflow-y-auto;
+}
+
+.admin-modal-foot {
+  @apply flex flex-wrap items-center justify-end gap-2 px-6 py-4 border-t border-line bg-surface;
+}
+
+.admin-field-label {
+  @apply text-[13px] font-semibold text-dark-900;
+}
+
+.admin-textarea {
+  @apply w-full rounded-[14px] border border-line bg-white px-3.5 py-3 text-[14px] leading-relaxed text-dark-900
+         outline-none resize-y placeholder:text-placeholder
+         focus:border-primary focus:ring-2 focus:ring-primary/20;
+}
+
+.admin-info-box {
+  @apply rounded-[14px] border border-line p-3.5 text-[13px];
+}
+
+.admin-info-label {
+  @apply mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted;
+}
+
+/* ---------- Admin: fees & platform settings ---------- */
+
+.admin-settings {
+  @apply grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_400px] gap-6 items-start;
+}
+
+.admin-settings-groups {
+  @apply flex flex-col gap-6 min-w-0;
+}
+
+.admin-settings-group-icon {
+  @apply flex items-center justify-center size-9 shrink-0 rounded-full bg-primary-light text-primary;
+}
+
+.admin-settings-group-icon svg {
+  @apply size-4.5;
+}
+
+.admin-setting {
+  @apply flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6 px-5 py-4;
+}
+
+.admin-setting + .admin-setting {
+  @apply border-t border-line;
+}
+
+.admin-setting-text {
+  @apply flex flex-col gap-0.5 min-w-0;
+}
+
+.admin-setting-label {
+  @apply text-[14px] font-semibold text-dark-900;
+}
+
+.admin-setting-hint {
+  @apply text-[13px] leading-relaxed text-muted;
+}
+
+/* Number input with a unit prefix/suffix, e.g. `$ [ 15.00 ]` or `[ 5.0 ] %` */
+.admin-unit-input {
+  @apply flex items-center w-full sm:w-[168px] h-10 shrink-0 bg-white rounded-[12px] border border-line
+         transition-colors cursor-text
+         focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20;
+}
+
+.admin-unit-input input {
+  @apply flex-1 min-w-0 h-full px-3 bg-transparent border-0 outline-none text-right text-[15px] font-semibold
+         tabular-nums text-dark-900;
+}
+
+.admin-unit-input span {
+  @apply flex items-center h-full px-3 text-[13px] font-medium text-muted select-none;
+}
+
+.admin-unit-input span:first-child {
+  @apply border-r border-line;
+}
+
+.admin-unit-input span:last-child {
+  @apply border-l border-line;
+}
+
+.admin-unit-input--changed {
+  @apply border-amber-300 bg-amber-50/40;
+}
+
+.admin-simulator {
+  @apply xl:sticky xl:top-10;
+}
+
+.admin-receipt {
+  @apply flex flex-col text-[13.5px];
+}
+
+.admin-receipt-row {
+  @apply flex items-center justify-between gap-4 py-2 text-muted;
+}
+
+.admin-receipt-row strong {
+  @apply font-semibold tabular-nums text-dark-900;
+}
+
+.admin-receipt-total {
+  @apply flex items-center justify-between gap-4 mt-1 pt-3 border-t border-line text-[15px] font-semibold text-dark-900;
+}
+
+.admin-receipt-total strong {
+  @apply text-[20px] font-bold tabular-nums text-primary;
+}
+
+.admin-split-bar {
+  @apply flex h-2.5 w-full overflow-hidden rounded-full bg-line;
+}
+
+.admin-split-legend {
+  @apply grid grid-cols-3 gap-2;
+}
+
+.admin-split-item {
+  @apply flex flex-col gap-0.5 min-w-0 p-3 rounded-[14px] bg-surface;
+}
+
+.admin-split-item p:first-child {
+  @apply flex items-center gap-1.5 text-[11.5px] font-medium text-muted truncate;
+}
+
+.admin-split-item p:last-child {
+  @apply text-[15px] font-bold tabular-nums text-dark-900;
+}
+
+.admin-split-dot {
+  @apply size-2 shrink-0 rounded-full;
+}
+
+} /* @layer components */
