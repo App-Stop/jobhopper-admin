@@ -3,6 +3,8 @@ import {
   ShieldCheck,
   Users,
   Briefcase,
+  Inbox,
+  Banknote,
   AlertTriangle,
   Tag,
   SlidersHorizontal,
@@ -16,6 +18,8 @@ const NAV = [
   { page: 'verifications', label: 'Verification Queue', icon: ShieldCheck },
   { page: 'users', label: 'Users', icon: Users },
   { page: 'jobs', label: 'Jobs & Orders', icon: Briefcase },
+  { page: 'openRequests', label: 'Open Requests', icon: Inbox },
+  { page: 'payouts', label: 'Payouts', icon: Banknote },
   { page: 'disputes', label: 'Disputes', icon: AlertTriangle },
   { page: 'categories', label: 'Categories', icon: Tag },
   { page: 'settings', label: 'Fees & Platform', icon: SlidersHorizontal },
@@ -51,10 +55,16 @@ const AdminLayout = ({ page, session, onLogout, children }) => (
         <span className="admin-avatar" aria-hidden="true">
           {session?.name ? session.name[0] : 'A'}
         </span>
-        <div className="admin-account-text">
+        <a
+          href={adminPaths.account}
+          className="admin-account-text no-underline"
+          aria-current={page === 'account' ? 'page' : undefined}
+          onClick={adminLinkClick(adminPaths.account)}
+          title="Account settings"
+        >
           <p className="admin-account-name">{session?.name || 'Administrator'}</p>
-          <p className="admin-account-email">{session?.email || 'admin@jobhopper.com'}</p>
-        </div>
+          <p className="admin-account-email">{session?.email || ''}</p>
+        </a>
         <button
           type="button"
           className="admin-icon-btn"

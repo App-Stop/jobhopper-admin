@@ -4,9 +4,12 @@ export const adminPaths = {
   verifications: '/verifications',
   users: '/users',
   jobs: '/jobs',
+  openRequests: '/open-requests',
+  payouts: '/payouts',
   disputes: '/disputes',
   categories: '/categories',
   settings: '/settings',
+  account: '/account',
 }
 
 const PAGES = Object.fromEntries(Object.entries(adminPaths).map(([page, path]) => [path, page]))

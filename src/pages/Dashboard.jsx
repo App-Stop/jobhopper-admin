@@ -1,16 +1,14 @@
 import { useState, useEffect } from 'react'
-import { ChevronRight, DollarSign, ShieldCheck, Users, Zap } from 'lucide-react'
+import { ChevronRight, DollarSign, Inbox, ShieldCheck, Users, Zap } from 'lucide-react'
 import { AdminHeader, AdminTable, NameCell, RefreshButton, StatCard, StatusPill } from './AdminParts'
 import { adminLinkClick, adminPaths } from '../navigation'
-import { apiCount, apiRequest, apiRequestAll } from '../api/client'
-import { ACTIVE_JOB_STATUSES, PAID_JOB_STATUSES } from '../constants'
+import { apiRequest } from '../api/client'
+import { categoryNames, formatMoney } from '../constants'
 
 const formatCurrency = (val) =>
   Number(val || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 
 const formatNumber = (val) => Number(val || 0).toLocaleString('en-US')
-
-const round2 = (v) => Math.round(v * 100) / 100
 
 const JOB_COLUMNS = [
   {
@@ -19,8 +17,8 @@ const JOB_COLUMNS = [
     render: (j) => (
       <NameCell
         name={j.jobCode || j.title || 'Job'}
-        sub={j.category?.name || j.title || 'General Service'}
-        avatarChar={j.category?.name?.[0] || 'J'}
+        sub={j.title || categoryNames(j).join(', ') || 'General Service'}
+        avatarChar={categoryNames(j)[0]?.[0] || 'J'}
       />
     ),
   },
@@ -46,7 +44,7 @@ const JOB_COLUMNS = [
   },
 ]
 
-// Queue profiles carry `user` as an id; `account` is joined in from the worker list in load().
+// Queue profiles carry `user` as a bare id; `account` is fetched per worker in load().
 const WORKER_COLUMNS = [
   {
     key: 'name',
@@ -62,7 +60,7 @@ const WORKER_COLUMNS = [
   {
     key: 'service',
     label: 'Trade',
-    render: (w) => <span>{w.services?.[0]?.categoryName || '—'}</span>,
+    render: (w) => <span>{w.services?.[0]?.category?.name || '—'}</span>,
   },
   {
     key: 'experience',
@@ -77,49 +75,104 @@ const WORKER_COLUMNS = [
   },
 ]
 
+const JOB_GROUPS = [
+  ['open', 'Open'],
+  ['active', 'Active (booked → awaiting confirmation)'],
+  ['completed', 'Completed (paid / reviewed)'],
+  ['disputed', 'Disputed'],
+  ['cancelled', 'Cancelled'],
+  ['expired', 'Expired'],
+  ['declined', 'Declined'],
+]
+
+const ESCROW_STAGES = [
+  ['inProgress', 'Jobs in progress'],
+  ['awaitingConfirmation', 'Awaiting client confirmation'],
+  ['disputed', 'Disputed'],
+]
+
+const Row = ({ label, value, sub, href }) => (
+  <div className="flex items-baseline justify-between gap-3 py-2 border-b border-line last:border-0 text-[13.5px]">
+    {href ? (
+      <a href={href} className="admin-link" onClick={adminLinkClick(href)}>
+        {label} <ChevronRight strokeWidth={2} />
+      </a>
+    ) : (
+      <span className="text-muted">{label}</span>
+    )}
+    <span className="text-right">
+      <strong className="tabular-nums text-dark-900">{value}</strong>
+      {sub && <span className="block text-[12px] text-muted">{sub}</span>}
+    </span>
+  </div>
+)
+
+const Panel = ({ title, hint, children }) => (
+  <section className="admin-card">
+    <div className="admin-card-head">
+      <div className="min-w-0">
+        <h2 className="admin-card-title">{title}</h2>
+        {hint && <p className="admin-card-hint">{hint}</p>}
+      </div>
+    </div>
+    <div className="px-5 pb-4">{children}</div>
+  </section>
+)
+
 const Dashboard = () => {
-  const [stats, setStats] = useState(null)
+  const [overview, setOverview] = useState(null)
+  const [overviewError, setOverviewError] = useState(null)
   const [recentJobs, setRecentJobs] = useState([])
   const [pendingWorkers, setPendingWorkers] = useState([])
+  const [pendingVerifications, setPendingVerifications] = useState(null)
   const [error, setError] = useState(null)
 
-  const load = async () => {
+  const loadOverview = async () => {
     try {
-      const [jobs, queueRes, workers, clientCount, settingsRes] = await Promise.all([
-        apiRequestAll('/admin/jobs', 'jobs'),
-        apiRequest('/admin/workers/verification-queue?limit=5'),
-        apiRequestAll('/admin/users', 'users', { role: 'worker' }),
-        apiCount('/admin/users', { role: 'client' }),
-        apiRequest('/settings/fees'),
+      const res = await apiRequest('/admin/overview')
+      setOverview(res?.data || null)
+      setOverviewError(null)
+    } catch (err) {
+      setOverviewError(err.message)
+    }
+  }
+
+  const loadTables = async () => {
+    try {
+      const [jobsRes, queueRes] = await Promise.all([
+        apiRequest('/admin/jobs?limit=5'),
+        apiRequest('/admin/workers/verification-queue?status=pending&limit=5'),
       ])
-
-      // Mirrors payment.service computeFees: the platform keeps the commission on the job amount
-      // plus the priority fee. Uses today's commission rate, so it's an estimate for older jobs.
-      const feePercent = settingsRes?.data?.platformFeePercent ?? 0
-      const revenue = jobs
-        .filter((j) => PAID_JOB_STATUSES.includes(j.status))
-        .reduce((sum, j) => sum + round2(((j.finalAmount ?? j.budget ?? 0) * feePercent) / 100) + (j.priorityFee || 0), 0)
-
-      const usersById = new Map(workers.map((u) => [u._id, u]))
       const queue = queueRes?.data?.profiles || []
 
-      setStats({
-        activeJobs: jobs.filter((j) => ACTIVE_JOB_STATUSES.includes(j.status)).length,
-        workers: workers.length,
-        clients: clientCount,
-        pendingVerifications: queueRes?.data?.pagination?.total ?? queue.length,
-        platformRevenue: revenue,
-      })
-      setRecentJobs(jobs.slice(0, 5))
-      setPendingWorkers(queue.map((p) => ({ ...p, account: usersById.get(p.user) || null })))
+      // The queue doesn't include the worker's name/email, so look each one up.
+      const accounts = await Promise.all(
+        queue.map((p) =>
+          apiRequest(`/admin/users/${p.user}`)
+            .then((res) => res?.data?.user || null)
+            .catch(() => null),
+        ),
+      )
+
+      setRecentJobs(jobsRes?.data?.jobs || [])
+      setPendingWorkers(queue.map((p, i) => ({ ...p, account: accounts[i] })))
+      setPendingVerifications(queueRes?.data?.pagination?.total ?? queue.length)
       setError(null)
     } catch (err) {
       setError(err.message)
     }
   }
+
+  const load = () => Promise.all([loadOverview(), loadTables()])
+
   useEffect(() => {
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const o = overview
+  const num = (v) => (o ? formatNumber(v) : '—')
+  const cash = (v) => (o ? formatMoney(v) : '—')
 
   return (
     <div className="admin-page">
@@ -140,28 +193,79 @@ const Dashboard = () => {
         }
       />
 
+      {overviewError && (
+        <p className="rounded-[14px] border border-rose-200 bg-rose-50 px-4 py-3 text-[13.5px] text-rose-700" role="alert">
+          Couldn&apos;t load the overview: {overviewError}
+        </p>
+      )}
+
       <div className="admin-stats">
         <StatCard
           icon={Zap}
           label="Active Jobs"
-          value={stats ? formatNumber(stats.activeJobs) : '—'}
+          value={num(o?.jobs?.active)}
+          note={o ? `${formatNumber(o.jobs?.total)} jobs in total` : undefined}
           highlight={true}
         />
         <StatCard
-          icon={ShieldCheck}
-          label="Registered Workers"
-          value={stats ? formatNumber(stats.workers) : '—'}
+          icon={DollarSign}
+          label="Platform Revenue"
+          value={o ? formatCurrency(o.revenue?.allTime) : '—'}
+          note={o ? `${formatCurrency(o.revenue?.thisMonth)} this month (UTC)` : undefined}
         />
         <StatCard
           icon={Users}
-          label="Registered Clients"
-          value={stats ? formatNumber(stats.clients) : '—'}
+          label="Users"
+          value={num(o?.users?.total)}
+          note={o ? `${formatNumber(o.users?.clients)} clients · ${formatNumber(o.users?.workers)} workers` : undefined}
         />
         <StatCard
-          icon={DollarSign}
-          label="Est. Platform Revenue"
-          value={stats ? formatCurrency(stats.platformRevenue) : '—'}
+          icon={Inbox}
+          label="Open Requests"
+          value={num(o?.openRequests?.total)}
+          note={o ? `${formatNumber(o.openRequests?.open)} open posts · ${formatNumber(o.openRequests?.directHire)} direct hire` : undefined}
         />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <Panel title="Jobs by stage" hint="Every job is in exactly one group.">
+          {JOB_GROUPS.map(([key, label]) => (
+            <Row key={key} label={label} value={num(o?.jobs?.[key])} />
+          ))}
+        </Panel>
+
+        <Panel
+          title="Money held"
+          hint="Client payments in escrow for unfinished jobs, and earnings workers haven't withdrawn."
+        >
+          {ESCROW_STAGES.map(([key, label]) => {
+            const stage = o?.escrow?.held?.[key]
+            return (
+              <Row
+                key={key}
+                label={label}
+                value={cash(stage?.total)}
+                sub={o ? `${formatNumber(stage?.count)} payments · ${formatMoney(stage?.serviceFee)} due to workers` : undefined}
+              />
+            )
+          })}
+          <Row
+            label="Worker wallets"
+            value={cash(o?.escrow?.workerWallets?.available)}
+            sub={o ? `available · ${formatMoney(o.escrow?.workerWallets?.pending)} pending` : undefined}
+          />
+        </Panel>
+
+        <Panel title="Needs attention">
+          <Row label="Open disputes" value={num(o?.openDisputes)} href={adminPaths.disputes} />
+          <Row label="Open requests" value={num(o?.openRequests?.total)} href={adminPaths.openRequests} />
+          <Row
+            label="Completed payouts"
+            value={cash(o?.payouts?.completedAmount)}
+            sub={o ? `${formatNumber(o.payouts?.completedCount)} withdrawals sent to banks` : undefined}
+            href={adminPaths.payouts}
+          />
+        </Panel>
       </div>
 
       <div className="admin-grid">
@@ -182,7 +286,7 @@ const Dashboard = () => {
         />
 
         <AdminTable
-          title={stats ? `Verification Queue (${formatNumber(stats.pendingVerifications)})` : 'Verification Queue'}
+          title={pendingVerifications !== null ? `Verification Queue (${formatNumber(pendingVerifications)})` : 'Verification Queue'}
           columns={WORKER_COLUMNS}
           rows={pendingWorkers}
           empty={error ? '—' : 'No pending worker verifications.'}

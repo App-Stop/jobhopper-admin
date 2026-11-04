@@ -1,45 +1,76 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Gavel, Pencil } from 'lucide-react'
-import { AdminHeader, AdminModal, AdminTable, AdminToolbar, NameCell, RefreshButton, StatusPill } from './AdminParts'
+import { Eye, Gavel, MessageSquarePlus, Search as SearchIcon } from 'lucide-react'
+import { AdminHeader, AdminModal, AdminTable, AdminToolbar, FileImage, NameCell, RefreshButton, StatusPill } from './AdminParts'
 import { apiRequest, apiRequestAll } from '../api/client'
+import { formatDate, formatDateTime, formatMoney } from '../constants'
 
-// Backend report statuses: open → under_review → resolved | dismissed.
+// Backend dispute statuses: open → under_review ⇄ awaiting_response → resolved.
+// `awaiting_response` means an evidence request is still open; once it's answered or expires the
+// backend reports the dispute as `under_review` again.
 const FILTER_STATUSES = {
   Open: 'open',
   'Under Review': 'under_review',
+  'Awaiting Response': 'awaiting_response',
   Resolved: 'resolved',
-  Dismissed: 'dismissed',
 }
 const FILTERS = ['All', ...Object.keys(FILTER_STATUSES)]
 
-const DECISIONS = [
-  { status: 'under_review', label: 'Under review' },
-  { status: 'resolved', label: 'Resolve (accept claim)' },
-  { status: 'dismissed', label: 'Dismiss (reject claim)' },
-]
+const REQUEST_STATE_LABELS = { open: 'Waiting for answer', answered: 'Answered', expired: 'Expired' }
 
-const formatDate = (d) =>
-  d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+const Photos = ({ photos }) =>
+  photos?.length ? (
+    <div className="mt-2 grid grid-cols-3 sm:grid-cols-5 gap-2">
+      {photos.map((p) => (
+        <FileImage key={p._id} file={p} className="aspect-square" />
+      ))}
+    </div>
+  ) : null
+
+const Submission = ({ title, submission }) => (
+  <div className="admin-info-box bg-surface">
+    <p className="admin-info-label">{title}</p>
+    <p className="font-semibold text-dark-900">{submission.reason || '—'}</p>
+    {submission.description && <p className="mt-1 leading-relaxed text-muted">“{submission.description}”</p>}
+    <Photos photos={submission.evidencePhotos} />
+    {submission.submittedAt && (
+      <p className="mt-1.5 text-[12px] text-muted">Submitted {formatDateTime(submission.submittedAt)}</p>
+    )}
+  </div>
+)
+
+const Party = ({ label, person }) => (
+  <div className="admin-info-box">
+    <p className="admin-info-label">{label}</p>
+    <p className="font-semibold text-dark-900">{person?.fullName || '—'}</p>
+    {person && (
+      <p className="text-[12px] text-muted">
+        {[person.email, person.phone].filter(Boolean).join(' · ')}
+        {person.isDeactivated && ' · Deactivated'}
+        {person.isDeleted && ' · Deleted account'}
+      </p>
+    )}
+  </div>
+)
 
 const Disputes = () => {
   const [reports, setReports] = useState([])
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('All')
-  const [selectedReport, setSelectedReport] = useState(null)
-  const [resolutionStatus, setResolutionStatus] = useState('resolved')
-  const [resolutionNote, setResolutionNote] = useState('')
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  // Reports only carry the job id, so admin jobs are loaded alongside to show the job code and parties.
+  // Detail modal
+  const [selectedId, setSelectedId] = useState(null)
+  const [detail, setDetail] = useState(null)
+  const [detailError, setDetailError] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [evidenceParty, setEvidenceParty] = useState('worker')
+  const [evidenceMessage, setEvidenceMessage] = useState('')
+  const [refundAmount, setRefundAmount] = useState('')
+  const [resolutionNote, setResolutionNote] = useState('')
+
   const loadReports = async () => {
     try {
-      const [list, jobs] = await Promise.all([
-        apiRequestAll('/reports', 'reports'),
-        apiRequestAll('/admin/jobs', 'jobs'),
-      ])
-      const jobsById = new Map(jobs.map((j) => [j._id, j]))
-      setReports(list.map((r) => ({ ...r, jobInfo: jobsById.get(r.job) || null })))
+      setReports(await apiRequestAll('/admin/disputes', 'reports'))
       setError(null)
     } catch (err) {
       setError(err.message)
@@ -50,48 +81,104 @@ const Disputes = () => {
     loadReports()
   }, [])
 
-  const handleOpenResolve = (rep) => {
-    setSelectedReport(rep)
-    setResolutionStatus(rep.status === 'open' ? 'resolved' : rep.status)
-    setResolutionNote(rep.resolutionNote || '')
+  const loadDetail = async (id) => {
+    try {
+      const res = await apiRequest(`/admin/disputes/${id}`)
+      setDetail(res?.data || null)
+      setDetailError(null)
+    } catch (err) {
+      setDetailError(err.message)
+    }
   }
 
-  const noteRequired = resolutionStatus !== 'under_review'
+  const openDetail = (r) => {
+    setSelectedId(r._id)
+    setDetail(null)
+    setDetailError(null)
+    setEvidenceParty('worker')
+    setEvidenceMessage('')
+    setRefundAmount('')
+    setResolutionNote('')
+    loadDetail(r._id)
+  }
 
-  const handleConfirmResolve = async (e) => {
-    e.preventDefault()
-    setLoading(true)
+  const closeDetail = () => {
+    setSelectedId(null)
+    setDetail(null)
+  }
+
+  // Runs an action, then refreshes both the detail and the list.
+  const act = async (fn) => {
+    setBusy(true)
     try {
-      await apiRequest(`/reports/${selectedReport._id}`, {
+      const res = await fn()
+      if (res?.data?.filing) setDetail(res.data)
+      else await loadDetail(selectedId)
+      loadReports()
+      return true
+    } catch (err) {
+      alert(err.message || 'Action failed')
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const markUnderReview = () =>
+    act(() =>
+      apiRequest(`/admin/disputes/${selectedId}`, {
         method: 'PATCH',
+        body: JSON.stringify({ status: 'under_review' }),
+      }),
+    )
+
+  const requestEvidence = async (e) => {
+    e.preventDefault()
+    const ok = await act(() =>
+      apiRequest(`/admin/disputes/${selectedId}/requests`, {
+        method: 'POST',
         body: JSON.stringify({
-          status: resolutionStatus,
+          party: evidenceParty,
+          ...(evidenceMessage.trim() ? { message: evidenceMessage.trim() } : {}),
+        }),
+      }),
+    )
+    if (ok) setEvidenceMessage('')
+  }
+
+  const serviceFee = detail?.payment?.serviceFee ?? null
+  const refund = Number(refundAmount)
+  const refundValid =
+    refundAmount !== '' && Number.isFinite(refund) && refund >= 0 && serviceFee !== null && refund <= serviceFee
+
+  const resolve = async (e) => {
+    e.preventDefault()
+    if (!refundValid) return
+    const workerShare = Math.round((serviceFee - refund) * 100) / 100
+    if (
+      !window.confirm(
+        `Resolve this dispute? The client is refunded ${formatMoney(refund)} and the worker is paid ${formatMoney(workerShare)}. This can't be undone.`,
+      )
+    ) {
+      return
+    }
+    await act(() =>
+      apiRequest(`/admin/disputes/${selectedId}/resolve`, {
+        method: 'POST',
+        body: JSON.stringify({
+          refundAmount: Math.round(refund * 100) / 100,
           ...(resolutionNote.trim() ? { resolutionNote: resolutionNote.trim() } : {}),
         }),
-      })
-      setSelectedReport(null)
-      loadReports()
-    } catch (err) {
-      alert(err.message || 'Update failed')
-    } finally {
-      setLoading(false)
-    }
+      }),
+    )
   }
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
     return reports.filter((r) => {
       const matchesFilter = filter === 'All' || r.status === FILTER_STATUSES[filter]
-
-      const fields = [
-        r.reason,
-        r.description,
-        r.jobInfo?.jobCode,
-        r.jobInfo?.client?.fullName,
-        r.jobInfo?.worker?.fullName,
-      ]
+      const fields = [r.reason, r.description, r.job?.jobCode, r.client?.fullName, r.worker?.fullName]
       const matchesQuery = !q || fields.some((f) => (f || '').toLowerCase().includes(q))
-
       return matchesFilter && matchesQuery
     })
   }, [reports, query, filter])
@@ -100,15 +187,15 @@ const Disputes = () => {
     {
       key: 'reason',
       label: 'Complaint / Reason',
-      render: (r) => <NameCell name={r.reason || 'Report'} sub={r.description} avatarChar="!" />,
+      render: (r) => <NameCell name={r.reason || 'Dispute'} sub={r.description} avatarChar="!" />,
     },
     {
       key: 'job',
       label: 'Job',
       render: (r) => (
         <div>
-          <p className="font-semibold text-primary">{r.jobInfo?.jobCode || '—'}</p>
-          {r.jobInfo?.title && <p className="admin-cell-sub max-w-[220px] truncate">{r.jobInfo.title}</p>}
+          <p className="font-semibold text-primary">{r.job?.jobCode || '—'}</p>
+          {r.job?.status && <p className="admin-cell-sub">{r.job.status.replace(/_/g, ' ')}</p>}
         </div>
       ),
     },
@@ -117,8 +204,8 @@ const Disputes = () => {
       label: 'Client / Worker',
       render: (r) => (
         <div>
-          <p className="admin-cell-strong">{r.jobInfo?.client?.fullName || '—'}</p>
-          <p className="admin-cell-sub">{r.jobInfo?.worker?.fullName || 'No worker assigned'}</p>
+          <p className="admin-cell-strong">{r.client?.fullName || '—'}</p>
+          <p className="admin-cell-sub">{r.worker?.fullName || 'No worker assigned'}</p>
         </div>
       ),
     },
@@ -130,7 +217,12 @@ const Disputes = () => {
     {
       key: 'status',
       label: 'Status',
-      render: (r) => <StatusPill status={r.status} />,
+      render: (r) => (
+        <div className="flex flex-col items-start gap-1">
+          <StatusPill status={r.status} />
+          {r.hasResponse && r.status !== 'resolved' && <span className="admin-cell-sub">Evidence received</span>}
+        </div>
+      ),
     },
     {
       key: 'action',
@@ -138,13 +230,13 @@ const Disputes = () => {
       align: 'right',
       render: (r) => (
         <div className="admin-row-actions">
-          {r.status === 'open' || r.status === 'under_review' ? (
-            <button type="button" className="btn btn-sm btn-primary" onClick={() => handleOpenResolve(r)}>
-              <Gavel strokeWidth={2} /> Take action
+          {r.status === 'resolved' ? (
+            <button type="button" className="btn btn-sm btn-outline" onClick={() => openDetail(r)}>
+              <Eye strokeWidth={2} /> View
             </button>
           ) : (
-            <button type="button" className="btn btn-sm btn-outline" onClick={() => handleOpenResolve(r)}>
-              <Pencil strokeWidth={2} /> Edit decision
+            <button type="button" className="btn btn-sm btn-primary" onClick={() => openDetail(r)}>
+              <Gavel strokeWidth={2} /> Review
             </button>
           )}
         </div>
@@ -152,14 +244,17 @@ const Disputes = () => {
     },
   ]
 
-  const openCount = reports.filter((r) => r.status === 'open' || r.status === 'under_review').length
+  const openCount = reports.filter((r) => r.status !== 'resolved').length
+  const resolved = detail?.status === 'resolved'
+  const jobDisputed = detail?.job?.status === 'disputed'
+  const openRequestFor = (party) => detail?.requests?.some((q) => q.party === party && q.state === 'open')
 
   return (
     <div className="admin-page">
       <AdminHeader
-        title="Disputes & Reports"
+        title="Disputes"
         count={reports.length}
-        subtitle={`${openCount} claims awaiting a decision. Review conflict details and record administrative resolutions.`}
+        subtitle={`${openCount} disputes awaiting a decision. Gather evidence from both sides, then split the held service fee.`}
         actions={<RefreshButton onRefresh={loadReports} />}
       />
 
@@ -170,87 +265,215 @@ const Disputes = () => {
         filters={FILTERS}
         filter={filter}
         onFilter={setFilter}
-        filterLabel="Filter by report status"
+        filterLabel="Filter by dispute status"
       />
 
       <AdminTable
         columns={columns}
         rows={rows}
-        empty={error ? `Couldn't load reports: ${error}` : 'No dispute reports match your filter.'}
+        empty={error ? `Couldn't load disputes: ${error}` : 'No disputes match your filter.'}
       />
 
-      {selectedReport && (
+      {selectedId && (
         <AdminModal
-          as="form"
-          onSubmit={handleConfirmResolve}
-          title="Arbitrate claim"
-          subtitle={`Job ${selectedReport.jobInfo?.jobCode || '—'} · reported ${formatDate(selectedReport.createdAt)}`}
-          onClose={() => setSelectedReport(null)}
+          size="max-w-3xl"
+          title={`Dispute · Job ${detail?.job?.jobCode || '—'}`}
+          subtitle={detail ? `Filed ${formatDateTime(detail.createdAt)}` : undefined}
+          onClose={closeDetail}
           footer={
             <>
-              <button type="button" className="btn btn-outline" onClick={() => setSelectedReport(null)}>
-                Cancel
-              </button>
-              <button type="submit" className="btn btn-primary" disabled={loading}>
-                {loading ? 'Saving…' : 'Save decision'}
+              {detail?.status === 'open' && (
+                <button type="button" className="btn btn-outline sm:mr-auto" disabled={busy} onClick={markUnderReview}>
+                  <SearchIcon strokeWidth={2} /> Mark under review
+                </button>
+              )}
+              <button type="button" className="btn btn-primary" onClick={closeDetail}>
+                Close
               </button>
             </>
           }
         >
-          <div className="admin-info-box bg-surface">
-            <p className="admin-info-label">Issue</p>
-            <p className="font-semibold text-dark-900">{selectedReport.reason}</p>
-            {selectedReport.description && (
-              <p className="mt-1 leading-relaxed text-muted">“{selectedReport.description}”</p>
-            )}
-          </div>
+          {detailError && <p className="text-[13px] text-rose-600">Couldn&apos;t load this dispute: {detailError}</p>}
+          {!detail && !detailError && <p className="text-[13px] text-muted">Loading…</p>}
 
-          {selectedReport.jobInfo && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="admin-info-box">
-                <p className="admin-info-label">Client</p>
-                <p className="font-semibold text-dark-900">{selectedReport.jobInfo.client?.fullName || '—'}</p>
+          {detail && (
+            <>
+              <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted">
+                <StatusPill status={detail.status} />
+                <span>Job status: {detail.job?.status?.replace(/_/g, ' ') || '—'}</span>
               </div>
-              <div className="admin-info-box">
-                <p className="admin-info-label">Worker</p>
-                <p className="font-semibold text-dark-900">{selectedReport.jobInfo.worker?.fullName || 'Unassigned'}</p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Party label="Client (filed the dispute)" person={detail.client} />
+                <Party label="Worker" person={detail.worker} />
               </div>
-            </div>
+
+              {detail.job?.description && (
+                <div className="admin-info-box leading-relaxed text-dark-900">
+                  <p className="admin-info-label">Job description</p>
+                  {detail.job.description}
+                </div>
+              )}
+
+              {detail.payment ? (
+                <div className="admin-info-box">
+                  <p className="admin-info-label">Payment</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[13px]">
+                    <p>Service fee <strong className="block text-dark-900">{formatMoney(detail.payment.serviceFee)}</strong></p>
+                    <p>Platform fee <strong className="block text-dark-900">{formatMoney(detail.payment.platformFee)}</strong></p>
+                    <p>Priority + tax <strong className="block text-dark-900">{formatMoney((detail.payment.priorityFee || 0) + (detail.payment.tax || 0))}</strong></p>
+                    <p>Client paid <strong className="block text-dark-900">{formatMoney(detail.payment.total)}</strong></p>
+                  </div>
+                  <p className="mt-1.5 text-[12px] text-muted">
+                    Escrow: {detail.payment.escrowStatus?.replace(/_/g, ' ') || '—'}
+                    {detail.payment.refundedAmount > 0 && ` · ${formatMoney(detail.payment.refundedAmount)} refunded`}
+                  </p>
+                </div>
+              ) : (
+                <p className="rounded-[14px] border border-amber-200 bg-amber-50 p-3.5 text-[13px] text-amber-800">
+                  No payment was found for this job, so it can&apos;t be resolved.
+                </p>
+              )}
+
+              {detail.filing && <Submission title="Client's complaint" submission={detail.filing} />}
+
+              {detail.requests?.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <span className="admin-field-label">Evidence requests</span>
+                  {detail.requests.map((q) => (
+                    <div key={q._id} className="admin-info-box">
+                      <p className="text-[13px] text-dark-900">
+                        <strong className="capitalize">{q.party}</strong> · asked {formatDateTime(q.requestedAt)} ·{' '}
+                        {REQUEST_STATE_LABELS[q.state] || q.state}
+                        {q.state === 'open' && ` (due ${formatDateTime(q.dueAt)})`}
+                      </p>
+                      {q.message && <p className="mt-1 text-[13px] text-muted">“{q.message}”</p>}
+                      {q.response && (
+                        <div className="mt-2">
+                          <Submission title={`${q.party === 'worker' ? "Worker's" : "Client's"} answer`} submission={q.response} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {resolved && detail.resolution && (
+                <div className="admin-info-box border-emerald-200 bg-emerald-50/50">
+                  <p className="admin-info-label">Decision</p>
+                  <p className="text-dark-900">
+                    Client refunded <strong>{formatMoney(detail.resolution.refundAmount)}</strong> · worker paid{' '}
+                    <strong>{formatMoney(detail.resolution.payoutAmount)}</strong>
+                  </p>
+                  {detail.resolution.note && <p className="mt-1 text-muted">“{detail.resolution.note}”</p>}
+                  <p className="mt-1.5 text-[12px] text-muted">
+                    {detail.resolution.resolvedBy?.fullName ? `By ${detail.resolution.resolvedBy.fullName} · ` : ''}
+                    {formatDateTime(detail.resolution.resolvedAt)}
+                  </p>
+                </div>
+              )}
+
+              {!resolved && !jobDisputed && (
+                <p className="rounded-[14px] border border-amber-200 bg-amber-50 p-3.5 text-[13px] text-amber-800">
+                  This job is no longer in the disputed state, so evidence can&apos;t be requested and the dispute can&apos;t
+                  be resolved.
+                </p>
+              )}
+
+              {!resolved && jobDisputed && (
+                <form onSubmit={requestEvidence} className="admin-info-box flex flex-col gap-2">
+                  <p className="admin-info-label">Request evidence</p>
+                  <div className="admin-filters w-full" role="group" aria-label="Ask">
+                    {['worker', 'client'].map((party) => (
+                      <button
+                        key={party}
+                        type="button"
+                        aria-pressed={evidenceParty === party}
+                        className="admin-filter flex-1 capitalize"
+                        onClick={() => setEvidenceParty(party)}
+                      >
+                        Ask the {party}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    rows={2}
+                    maxLength={500}
+                    className="admin-textarea"
+                    placeholder="Optional message, e.g. Please share photos of the finished work."
+                    value={evidenceMessage}
+                    onChange={(e) => setEvidenceMessage(e.target.value)}
+                  />
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[12px] text-muted">
+                      {openRequestFor(evidenceParty)
+                        ? `The ${evidenceParty} already has an open request.`
+                        : 'They are notified and have until the evidence window (Settings) ends to answer.'}
+                    </span>
+                    <button
+                      type="submit"
+                      className="btn btn-sm btn-outline"
+                      disabled={busy || openRequestFor(evidenceParty)}
+                    >
+                      <MessageSquarePlus strokeWidth={2} /> Send request
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {!resolved && jobDisputed && detail.payment && (
+                <form onSubmit={resolve} className="admin-info-box flex flex-col gap-2">
+                  <p className="admin-info-label">Resolve</p>
+                  <p className="text-[12px] text-muted">
+                    Split the {formatMoney(serviceFee)} service fee: the client gets the refund, the worker gets the
+                    rest. Platform fee, priority fee and tax are never refunded.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="admin-unit-input">
+                      <span>$</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min={0}
+                        max={serviceFee ?? undefined}
+                        required
+                        aria-label="Refund to client"
+                        placeholder="0.00"
+                        value={refundAmount}
+                        onChange={(e) => setRefundAmount(e.target.value)}
+                      />
+                    </label>
+                    <button type="button" className="btn btn-sm btn-ghost" onClick={() => setRefundAmount('0')}>
+                      Pay worker in full
+                    </button>
+                    <button type="button" className="btn btn-sm btn-ghost" onClick={() => setRefundAmount(String(serviceFee))}>
+                      Refund client in full
+                    </button>
+                  </div>
+                  {refundValid && (
+                    <p className="text-[13px] text-dark-900">
+                      Client refund {formatMoney(refund)} · worker payout{' '}
+                      {formatMoney(Math.round((serviceFee - refund) * 100) / 100)}
+                    </p>
+                  )}
+                  <textarea
+                    rows={3}
+                    maxLength={1000}
+                    className="admin-textarea"
+                    placeholder="Resolution note (optional) — included in the notification to both sides."
+                    value={resolutionNote}
+                    onChange={(e) => setResolutionNote(e.target.value)}
+                  />
+                  <div className="flex justify-end">
+                    <button type="submit" className="btn btn-primary" disabled={busy || !refundValid}>
+                      <Gavel strokeWidth={2} /> {busy ? 'Saving…' : 'Resolve dispute'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </>
           )}
-
-          <div className="flex flex-col gap-1.5">
-            <span className="admin-field-label">Decision</span>
-            <div className="admin-filters w-full" role="group" aria-label="Decision">
-              {DECISIONS.map(({ status, label }) => (
-                <button
-                  key={status}
-                  type="button"
-                  aria-pressed={resolutionStatus === status}
-                  className="admin-filter flex-1"
-                  onClick={() => setResolutionStatus(status)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {resolutionStatus !== 'under_review' && (
-              <p className="text-[12px] text-muted">The reporter is notified when a claim is resolved or dismissed.</p>
-            )}
-          </div>
-
-          <label className="flex flex-col gap-1.5">
-            <span className="admin-field-label">
-              Resolution note{!noteRequired && <span className="font-normal text-muted"> (optional)</span>}
-            </span>
-            <textarea
-              rows={4}
-              className="admin-textarea"
-              placeholder="Explain the verdict for both customer and tradesperson…"
-              value={resolutionNote}
-              onChange={(e) => setResolutionNote(e.target.value)}
-              required={noteRequired}
-            />
-          </label>
         </AdminModal>
       )}
     </div>

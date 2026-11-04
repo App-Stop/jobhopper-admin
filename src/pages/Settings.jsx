@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react'
-import { Check, Receipt, RotateCcw, Save, Wallet, Zap } from 'lucide-react'
+import { Check, ListChecks, Receipt, RotateCcw, Save, Scale, ShieldCheck, Wallet, Zap } from 'lucide-react'
 import { AdminHeader } from './AdminParts'
 import { apiRequest } from '../api/client'
 
+// Placeholders shown until GET /admin/settings answers; editing stays locked until then.
 const DEFAULTS = {
   platformFeePercent: 5.0,
   priorityFeeFlat: 15.0,
   taxPercent: 5.7,
   withdrawalFeeFlat: 0.0,
+  standardCancellationClientRefundPercent: 60,
   urgentRequestTimeoutSeconds: 120,
+  requestTimeoutSeconds: 7200,
+  paymentTimeoutSeconds: 7200,
+  clientConfirmationTimeoutSeconds: 3600,
+  disputeResponseTimeoutSeconds: 43200,
 }
 
 const GROUPS = [
@@ -33,17 +39,33 @@ const GROUPS = [
         min: 0,
         max: 100,
       },
+      {
+        key: 'paymentTimeoutSeconds',
+        label: 'Payment window',
+        hint: 'How long the client has to pay after a worker is hired before the job expires.',
+        suffix: 'sec',
+        min: 1,
+        timeout: true,
+      },
     ],
   },
   {
-    title: 'Emergency dispatch',
-    hint: 'Jobs posted with ASAP urgency.',
+    title: 'Job requests',
+    hint: 'How long a posted job or direct request stays open for workers.',
     icon: Zap,
     fields: [
       {
+        key: 'requestTimeoutSeconds',
+        label: 'Request timeout',
+        hint: 'How long a standard job request stays open before it expires.',
+        suffix: 'sec',
+        min: 1,
+        timeout: true,
+      },
+      {
         key: 'priorityFeeFlat',
-        label: 'Priority fee',
-        hint: 'Flat rush fee charged to the client and kept by JobHopper. Locked in when the job is posted.',
+        label: 'Priority fee (ASAP)',
+        hint: 'Flat rush fee charged to the client on ASAP jobs and kept by JobHopper. Locked in when the job is posted.',
         prefix: '$',
         min: 0,
       },
@@ -53,6 +75,38 @@ const GROUPS = [
         hint: 'How long a worker has to accept an urgent direct request before it expires.',
         suffix: 'sec',
         min: 1,
+        timeout: true,
+      },
+    ],
+  },
+  {
+    title: 'Completion, cancellation & disputes',
+    hint: 'What happens after the work is done, or when a booking falls through.',
+    icon: Scale,
+    fields: [
+      {
+        key: 'clientConfirmationTimeoutSeconds',
+        label: 'Client confirmation window',
+        hint: 'After the worker marks a job complete, the client has this long to confirm or report an issue; then payment is released to the worker automatically.',
+        suffix: 'sec',
+        min: 1,
+        timeout: true,
+      },
+      {
+        key: 'standardCancellationClientRefundPercent',
+        label: 'Early cancellation refund',
+        hint: 'Share of the job amount refunded when a client cancels a paid standard job at least 24 hours before it is scheduled. Later cancellations refund nothing; fees and tax are never refunded.',
+        suffix: '%',
+        min: 0,
+        max: 100,
+      },
+      {
+        key: 'disputeResponseTimeoutSeconds',
+        label: 'Dispute evidence window',
+        hint: 'How long a client or worker has to answer an admin’s evidence request on a dispute.',
+        suffix: 'sec',
+        min: 1,
+        timeout: true,
       },
     ],
   },
@@ -78,10 +132,14 @@ const num = (v) => parseFloat(v) || 0
 const money = (v) => `$${v.toFixed(2)}`
 
 const formatTimeout = (seconds) => {
-  const s = Math.round(num(seconds))
-  const m = Math.floor(s / 60)
-  if (!m) return `${s} seconds`
-  return s % 60 ? `${m} min ${s % 60} sec` : `${m} min`
+  let s = Math.round(num(seconds))
+  const parts = []
+  for (const [unit, size] of [['h', 3600], ['min', 60], ['sec', 1]]) {
+    const n = Math.floor(s / size)
+    if (n) parts.push(`${n} ${unit}`)
+    s -= n * size
+  }
+  return parts.join(' ') || '0 sec'
 }
 
 const UnitInput = ({ prefix, suffix, changed, className = '', ...input }) => (
@@ -92,9 +150,68 @@ const UnitInput = ({ prefix, suffix, changed, className = '', ...input }) => (
   </label>
 )
 
+// GET /admin/field-options — the fixed choice lists the apps offer. Read-only: old jobs and reports
+// store the exact text, so these can't be edited.
+const FIELD_OPTION_LISTS = [
+  ['Client cancellation reasons', (d) => d.cancellationReasons?.client],
+  ['Worker cancellation reasons', (d) => d.cancellationReasons?.worker],
+  ['Reasons a client can report a worker', (d) => d.userReportReasons?.worker],
+  ['Reasons a worker can report a client', (d) => d.userReportReasons?.client],
+  ['Dispute reasons (client)', (d) => d.disputeReasons],
+  ['Dispute answers (worker)', (d) => d.disputeResponseReasons],
+]
+
+const FieldOptions = () => {
+  const [data, setData] = useState(null)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    apiRequest('/admin/field-options')
+      .then((res) => setData(res?.data || {}))
+      .catch((err) => setError(err.message))
+  }, [])
+
+  return (
+    <section className="admin-card">
+      <div className="admin-card-head justify-start">
+        <span className="admin-settings-group-icon">
+          <ListChecks strokeWidth={1.75} />
+        </span>
+        <div className="min-w-0">
+          <h2 className="admin-card-title">Choice lists</h2>
+          <p className="admin-card-hint">
+            The fixed reasons people pick in the apps. Read-only: past jobs and reports store this exact text. Every
+            list ends with &ldquo;Other&rdquo;, which needs a written description.
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-5">
+        {error && <p className="text-[13px] text-rose-600">Couldn&apos;t load the choice lists: {error}</p>}
+        {!data && !error && <p className="text-[13px] text-muted">Loading…</p>}
+        {data &&
+          FIELD_OPTION_LISTS.map(([title, pick]) => (
+            <details key={title} className="admin-info-box">
+              <summary className="cursor-pointer font-semibold text-dark-900">
+                {title} <span className="font-normal text-muted">({pick(data)?.length ?? 0})</span>
+              </summary>
+              <ul className="mt-2 list-disc pl-5 text-[13px] text-dark-900">
+                {(pick(data) || []).map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            </details>
+          ))}
+      </div>
+    </section>
+  )
+}
+
 const Settings = () => {
   const [values, setValues] = useState(DEFAULTS)
   const [baseline, setBaseline] = useState(DEFAULTS)
+  // Veriff toggle (boolean, kept apart from the numeric fields).
+  const [veriff, setVeriff] = useState(false)
+  const [veriffBaseline, setVeriffBaseline] = useState(false)
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState(null) // { type: 'saved' | 'error', message }
   // Editing stays locked until the live values load, so a save can never write DEFAULTS over real rates.
@@ -108,11 +225,13 @@ const Settings = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await apiRequest('/settings/fees')
+        const res = await apiRequest('/admin/settings')
         const d = res?.data || {}
         const live = Object.fromEntries(KEYS.map((k) => [k, d[k] ?? DEFAULTS[k]]))
         setValues(live)
         setBaseline(live)
+        setVeriff(d.veriffEnabled === true)
+        setVeriffBaseline(d.veriffEnabled === true)
         setLoaded(true)
       } catch (err) {
         setLoadError(err.message || 'Failed to load the current fee settings.')
@@ -122,7 +241,8 @@ const Settings = () => {
   }, [])
 
   const isChanged = (key) => num(values[key]) !== num(baseline[key]) || values[key] === ''
-  const dirty = KEYS.some(isChanged)
+  const veriffChanged = veriff !== veriffBaseline
+  const dirty = KEYS.some(isChanged) || veriffChanged
 
   const setField = (key) => (e) => {
     setValues((v) => ({ ...v, [key]: e.target.value }))
@@ -131,6 +251,7 @@ const Settings = () => {
 
   const handleDiscard = () => {
     setValues(baseline)
+    setVeriff(veriffBaseline)
     setStatus(null)
   }
 
@@ -138,16 +259,21 @@ const Settings = () => {
     e.preventDefault()
     setSaving(true)
     setStatus(null)
-    const payload = Object.fromEntries(KEYS.map((k) => [k, Number(values[k])]))
+    // The PATCH body is strict; send only what changed.
+    const payload = Object.fromEntries(KEYS.filter(isChanged).map((k) => [k, Number(values[k])]))
+    if (veriffChanged) payload.veriffEnabled = veriff
     try {
       const res = await apiRequest('/admin/settings', {
         method: 'PATCH',
         body: JSON.stringify(payload),
       })
       // The PATCH response carries the stored settings; treat those as the new source of truth.
-      const saved = Object.fromEntries(KEYS.map((k) => [k, res?.data?.[k] ?? payload[k]]))
+      const saved = Object.fromEntries(KEYS.map((k) => [k, res?.data?.[k] ?? payload[k] ?? values[k]]))
       setValues(saved)
       setBaseline(saved)
+      const savedVeriff = res?.data?.veriffEnabled ?? veriff
+      setVeriff(savedVeriff)
+      setVeriffBaseline(savedVeriff)
       setStatus({ type: 'saved', message: 'Changes saved' })
       setTimeout(() => setStatus((s) => (s?.type === 'saved' ? null : s)), 3000)
     } catch (err) {
@@ -179,7 +305,7 @@ const Settings = () => {
     <div className="admin-page">
       <AdminHeader
         title="Fees & Platform"
-        subtitle="Marketplace-wide commission, tax and dispatch rules. Commission and tax apply to every job paid after you save; the priority fee and request timeout apply to jobs posted after you save."
+        subtitle="Marketplace-wide fees, time windows and verification rules. Commission and tax apply to every job paid after you save; the priority fee and request timeouts apply to jobs posted after you save."
         actions={
           <>
             {status?.type === 'saved' && (
@@ -224,13 +350,13 @@ const Settings = () => {
                 </div>
               </div>
 
-              {fields.map(({ key, label, hint: fieldHint, ...input }) => (
+              {fields.map(({ key, label, hint: fieldHint, timeout, ...input }) => (
                 <div key={key} className="admin-setting">
                   <div className="admin-setting-text">
                     <p className="admin-setting-label">{label}</p>
                     <p className="admin-setting-hint">
                       {fieldHint}
-                      {key === 'urgentRequestTimeoutSeconds' && (
+                      {timeout && (
                         <span className="text-dark-900"> Currently {formatTimeout(values[key])}.</span>
                       )}
                     </p>
@@ -247,6 +373,39 @@ const Settings = () => {
               ))}
             </section>
           ))}
+
+          <section className="admin-card">
+            <div className="admin-card-head justify-start">
+              <span className="admin-settings-group-icon">
+                <ShieldCheck strokeWidth={1.75} />
+              </span>
+              <div className="min-w-0">
+                <h2 className="admin-card-title">Worker verification</h2>
+                <p className="admin-card-hint">How submitted worker ID photos are checked.</p>
+              </div>
+            </div>
+            <label className="admin-setting cursor-pointer select-none">
+              <div className="admin-setting-text">
+                <p className="admin-setting-label">Automatic checks with Veriff</p>
+                <p className="admin-setting-hint">
+                  On: ID photos are also sent to Veriff for an automatic decision. Off: every submission waits for
+                  an admin in the Verification Queue. If Veriff isn&apos;t configured on the server, workers can&apos;t
+                  submit while this is on.
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                aria-label="Automatic checks with Veriff"
+                className="size-5 accent-primary cursor-pointer"
+                checked={veriff}
+                disabled={!loaded}
+                onChange={(e) => {
+                  setVeriff(e.target.checked)
+                  setStatus(null)
+                }}
+              />
+            </label>
+          </section>
         </form>
 
         <section className="admin-card admin-simulator">
@@ -350,6 +509,8 @@ const Settings = () => {
           </div>
         </section>
       </div>
+
+      <FieldOptions />
     </div>
   )
 }

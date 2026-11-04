@@ -2,21 +2,11 @@ import { useState, useEffect, useMemo } from 'react'
 import { Eye, MapPin, Zap } from 'lucide-react'
 import { AdminHeader, AdminModal, AdminTable, AdminToolbar, NameCell, RefreshButton, StatusPill } from './AdminParts'
 import { apiRequestAll } from '../api/client'
-import { ACTIVE_JOB_STATUSES, JOB_STATUS_GROUPS as FILTER_STATUSES } from '../constants'
+import { ACTIVE_JOB_STATUSES, JOB_STATUS_GROUPS as FILTER_STATUSES, categoryNames, formatDateTime as formatDate, formatMoney as money } from '../constants'
 
 const FILTERS = ['All', ...Object.keys(FILTER_STATUSES)]
 
 const URGENCY_LABELS = { standard: 'Standard', within_24h: 'Within 24h', asap: 'ASAP' }
-
-const money = (v) =>
-  v === null || v === undefined
-    ? '—'
-    : Number(v).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-
-const formatDate = (d) =>
-  d
-    ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-    : '—'
 
 const formatAddress = (a) =>
   a && typeof a === 'object'
@@ -51,7 +41,7 @@ const Jobs = () => {
     return jobs.filter((j) => {
       const matchesFilter = filter === 'All' || FILTER_STATUSES[filter].includes(j.status)
 
-      const fields = [j.jobCode, j.title, j.category?.name, j.client?.fullName, j.worker?.fullName]
+      const fields = [j.jobCode, j.title, ...categoryNames(j), j.client?.fullName, j.worker?.fullName]
       const matchesQuery = !q || fields.some((f) => (f || '').toLowerCase().includes(q))
 
       return matchesFilter && matchesQuery
@@ -65,8 +55,8 @@ const Jobs = () => {
       render: (j) => (
         <NameCell
           name={j.jobCode || 'Job'}
-          sub={j.title || j.category?.name || 'Service Job'}
-          avatarChar={j.category?.name?.[0] || 'J'}
+          sub={j.title || categoryNames(j).join(', ') || 'Service Job'}
+          avatarChar={categoryNames(j)[0]?.[0] || 'J'}
         />
       ),
     },
@@ -127,7 +117,7 @@ const Jobs = () => {
       <AdminHeader
         title="Jobs & Orders"
         count={jobs.length}
-        subtitle={`${activeCount} jobs booked or in progress. Track orders from dispatch to completion and escrow release.`}
+        subtitle={`${activeCount} jobs booked, in progress or awaiting the client's confirmation. Track orders from dispatch to completion and escrow release.`}
         actions={<RefreshButton onRefresh={loadJobs} />}
       />
 
@@ -150,7 +140,7 @@ const Jobs = () => {
       {selectedJob && (
         <AdminModal
           title={selectedJob.jobCode || 'Job'}
-          subtitle={[selectedJob.title, selectedJob.category?.name].filter(Boolean).join(' · ')}
+          subtitle={[selectedJob.title, categoryNames(selectedJob).join(', ')].filter(Boolean).join(' · ')}
           onClose={() => setSelectedJob(null)}
           footer={
             <>

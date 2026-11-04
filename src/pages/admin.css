@@ -543,4 +543,7 @@
   @apply size-2 shrink-0 rounded-full;
 }
 
-} /* @layer components */
+.admin-date-input {
+  @apply h-9 px-3 rounded-[12px] border border-line bg-white text-[13px] text-dark-900 outline-none focus:border-primary;
+}
+}

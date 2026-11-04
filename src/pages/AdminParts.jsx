@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, Search, TrendingDown, TrendingUp, X } from 'lucide-react'
+import { ImageOff, RefreshCw, Search, TrendingDown, TrendingUp, X } from 'lucide-react'
+import { apiFileObjectUrl } from '../api/client'
 
 // `count` renders as a pill next to the title; `actions` is the right-hand button group.
 export const AdminHeader = ({ title, subtitle, count, actions }) => (
@@ -37,7 +38,8 @@ export const RefreshButton = ({ onRefresh }) => {
 }
 
 // Search box + segmented status filter shown above list tables.
-export const AdminToolbar = ({ query, onQuery, placeholder, filters, filter, onFilter, filterLabel }) => (
+// `renderFilter` turns a filter value into its button text (defaults to the value itself).
+export const AdminToolbar = ({ query, onQuery, placeholder, filters, filter, onFilter, filterLabel, renderFilter = (f) => f }) => (
   <div className="admin-toolbar">
     <label className="admin-search">
       <Search strokeWidth={1.5} />
@@ -59,7 +61,7 @@ export const AdminToolbar = ({ query, onQuery, placeholder, filters, filter, onF
             className="admin-filter"
             onClick={() => onFilter(f)}
           >
-            {f}
+            {renderFilter(f)}
           </button>
         ))}
       </div>
@@ -94,7 +96,7 @@ export const AdminModal = ({ title, subtitle, onClose, footer, children, size = 
   )
 }
 
-export const StatCard = ({ icon: Icon, label, value, change, highlight = false }) => {
+export const StatCard = ({ icon: Icon, label, value, change, note, highlight = false }) => {
   const hasChange = change !== undefined && change !== null
   const up = change >= 0
   const Trend = up ? TrendingUp : TrendingDown
@@ -108,6 +110,7 @@ export const StatCard = ({ icon: Icon, label, value, change, highlight = false }
         </span>
       </div>
       <p className="admin-stat-value">{value}</p>
+      {note && <p className="admin-stat-label">{note}</p>}
       {hasChange && (
         <p className={`admin-trend ${up ? 'admin-trend--up' : 'admin-trend--down'}`}>
           <Trend strokeWidth={2} />
@@ -122,16 +125,17 @@ const STATUS_CONFIG = {
   open: { label: 'Open', modifier: 'pending' },
   accepted: { label: 'Accepted', modifier: 'pending' },
   awaiting_payment: { label: 'Awaiting Pay', modifier: 'pending' },
+  awaiting_dispatch: { label: 'Awaiting Dispatch', modifier: 'pending' },
   en_route: { label: 'En Route', modifier: 'pending' },
   arrived: { label: 'Arrived', modifier: 'pending' },
   started: { label: 'In Progress', modifier: 'pending' },
-  in_progress: { label: 'In Progress', modifier: 'pending' },
-  completed: { label: 'Completed', modifier: 'active' },
+  completed: { label: 'Awaiting Confirmation', modifier: 'pending' },
   paid: { label: 'Paid', modifier: 'active' },
   reviewed: { label: 'Reviewed', modifier: 'active' },
   cancelled: { label: 'Cancelled', modifier: 'inactive' },
   disputed: { label: 'Disputed', modifier: 'suspended' },
   expired: { label: 'Expired', modifier: 'inactive' },
+  declined: { label: 'Declined', modifier: 'inactive' },
   pending: { label: 'Pending', modifier: 'pending' },
   approved: { label: 'Approved', modifier: 'active' },
   rejected: { label: 'Rejected', modifier: 'suspended' },
@@ -141,14 +145,15 @@ const STATUS_CONFIG = {
   suspended: { label: 'Suspended', modifier: 'suspended' },
   not_submitted: { label: 'Not Submitted', modifier: 'inactive' },
   under_review: { label: 'Under Review', modifier: 'pending' },
+  awaiting_response: { label: 'Awaiting Response', modifier: 'pending' },
   resolved: { label: 'Resolved', modifier: 'active' },
-  dismissed: { label: 'Dismissed', modifier: 'inactive' },
 }
 
-export const StatusPill = ({ status }) => {
+// `overrides` replaces entries for one page, e.g. payout `completed` vs job `completed`.
+export const StatusPill = ({ status, overrides }) => {
   const raw = String(status || '').trim()
   const key = raw.toLowerCase().replace(/[-\s]/g, '_')
-  const conf = STATUS_CONFIG[key] || {
+  const conf = overrides?.[key] || STATUS_CONFIG[key] || {
     label: raw ? raw.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Unknown',
     modifier: 'inactive',
   }
@@ -223,3 +228,64 @@ export const NameCell = ({ name = 'User', sub, avatarChar }) => (
     </div>
   </div>
 )
+
+/**
+ * Shows a backend file object. Public files have an http(s) `location`; private ones (ID documents
+ * stored as `private://…`, dispute evidence with `url: /files/:id/content`) are fetched with the
+ * admin token and shown from an object URL.
+ */
+export const FileImage = ({ file, alt, className = '' }) => {
+  const publicUrl = /^https?:\/\//.test(file?.location || '') ? file.location : null
+  const [src, setSrc] = useState(publicUrl)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    if (publicUrl || !file?._id) return
+    let objectUrl = null
+    let cancelled = false
+    apiFileObjectUrl(file._id)
+      .then((url) => {
+        objectUrl = url
+        if (cancelled) URL.revokeObjectURL(url)
+        else setSrc(url)
+      })
+      .catch(() => !cancelled && setFailed(true))
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [file?._id, publicUrl])
+
+  const box = `flex items-center justify-center overflow-hidden rounded-xl border border-line bg-surface ${className}`
+  if (!file) {
+    return (
+      <div className={`${box} text-[12px] text-muted`}>
+        <ImageOff className="size-4 mr-1.5" strokeWidth={1.5} /> Not provided
+      </div>
+    )
+  }
+  if (failed) return <div className={`${box} text-[12px] text-rose-600`}>Couldn&apos;t load image</div>
+  if (!src) return <div className={`${box} text-[12px] text-muted`}>Loading…</div>
+  return (
+    <a href={src} target="_blank" rel="noreferrer" className={box}>
+      <img src={src} alt={alt || file.filename || 'File'} className="size-full object-cover" />
+    </a>
+  )
+}
+
+// Previous / next controls for server-paginated lists.
+export const Pager = ({ page, totalPages, onPage }) =>
+  totalPages > 1 ? (
+    <div className="flex items-center justify-end gap-3 text-[13px] text-muted">
+      <button type="button" className="btn btn-sm btn-outline" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+        Previous
+      </button>
+      <span>
+        Page {page} of {totalPages}
+      </span>
+      <button type="button" className="btn btn-sm btn-outline" disabled={page >= totalPages} onClick={() => onPage(page + 1)}>
+        Next
+      </button>
+    </div>
+  ) : null
+

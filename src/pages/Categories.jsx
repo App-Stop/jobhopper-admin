@@ -19,7 +19,8 @@ const Categories = () => {
 
   const loadCategories = async () => {
     try {
-      setCategories(await apiRequestAll('/categories', 'categories'))
+      // The public /categories list only returns active categories; the admin list returns all.
+      setCategories(await apiRequestAll('/admin/categories', 'categories'))
       setError(null)
     } catch (err) {
       setError(err.message)

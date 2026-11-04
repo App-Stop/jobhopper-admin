@@ -78,6 +78,28 @@ const errorMessage = (json, status) => {
   return json?.message || `Request failed with status ${status}`
 }
 
+/**
+ * Loads an authorized file (`GET /files/:id/content`) and returns an object URL for <img src>.
+ * Private files (ID documents, dispute evidence) need the Bearer token, so a plain URL won't do.
+ * The caller must URL.revokeObjectURL() it when done.
+ */
+export async function apiFileObjectUrl(fileId) {
+  const token = getStoredAuth()?.token
+  let res
+  try {
+    res = await fetch(`${API_URL}/files/${fileId}/content`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+  } catch {
+    throw new Error(`Cannot reach the JobHopper server at ${API_URL}.`)
+  }
+  if (!res.ok) {
+    const json = await res.json().catch(() => null)
+    throw new Error(errorMessage(json, res.status))
+  }
+  return URL.createObjectURL(await res.blob())
+}
+
 const PAGE_LIMIT = 100 // backend maximum
 
 /**
