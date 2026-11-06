@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Eye } from 'lucide-react'
 import { AdminHeader, AdminModal, AdminTable, AdminToolbar, NameCell, Pager, RefreshButton, StatusPill } from './AdminParts'
 import { apiRequest } from '../api/client'
+import ListFilters from './ListFilters'
 import { formatDate, formatDateTime, formatMoney } from '../constants'
 
 // Backend WITHDRAWAL_STATUSES.
@@ -32,6 +33,7 @@ const Payouts = () => {
   const [query, setQuery] = useState('')
   const [search, setSearch] = useState('') // debounced `query`
   const [filter, setFilter] = useState('All')
+  const [statuses, setStatuses] = useState([])
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [error, setError] = useState(null)
@@ -39,6 +41,10 @@ const Payouts = () => {
   const [detail, setDetail] = useState(null)
   const [detailError, setDetailError] = useState(null)
   const requestId = useRef(0)
+  const detailRequest = useRef(0)
+  const [loading, setLoading] = useState(false)
+  useEffect(() => () => { requestId.current++; detailRequest.current++ }, [])
+  const closeDetail = () => { detailRequest.current++; setSelected(null) }
 
   // Any filter change goes back to page 1.
   const withPageReset = (setter) => (value) => {
@@ -57,42 +63,50 @@ const Payouts = () => {
   }, [query, search])
 
   const load = async () => {
+    const id = ++requestId.current
     if (from && to && from > to) {
       setError('The end date must be on or after the start date.')
+      setLoading(false)
       return
     }
-    const id = ++requestId.current
+    setLoading(true)
+    setError(null)
     const params = new URLSearchParams({ page, limit: PAGE_SIZE })
     if (search) params.set('search', search)
-    if (filter !== 'All') params.set('status', filter)
+    if (statuses.length) params.set('status', statuses.join(','))
+    else if (filter !== 'All') params.set('status', filter)
     if (from) params.set('from', from)
     if (to) params.set('to', to)
     try {
       const res = await apiRequest(`/admin/payouts?${params}`)
       if (id !== requestId.current) return // a newer request is in flight
-      setPayouts(res?.data?.payouts || [])
+      if (!Array.isArray(res?.data?.payouts)) throw new Error('Unexpected list response from the server.')
+      setPayouts(res.data.payouts)
       setCounts(res?.data?.counts || {})
       setPagination(res?.data?.pagination || null)
       setError(null)
     } catch (err) {
       if (id === requestId.current) setError(err.message)
-    }
+    } finally { if (id === requestId.current) setLoading(false) }
   }
 
   useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, search, filter, from, to])
+  }, [page, search, filter, from, to, statuses])
 
   const openDetail = async (p) => {
+    const id = ++detailRequest.current
     setSelected(p)
     setDetail(null)
     setDetailError(null)
     try {
       const res = await apiRequest(`/admin/payouts/${p._id}`)
-      setDetail(res?.data || null)
+      if (id !== detailRequest.current) return
+      if (!res?.data?._id) throw new Error('Unexpected detail response from the server.')
+      setDetail(res.data)
     } catch (err) {
-      setDetailError(err.message)
+      if (id === detailRequest.current) setDetailError(err.message)
     }
   }
 
@@ -173,11 +187,12 @@ const Payouts = () => {
         placeholder="Search worker, email, phone or Stripe ID"
         filters={FILTERS}
         filter={filter}
-        onFilter={withPageReset(setFilter)}
+        onFilter={(value) => { setStatuses([]); withPageReset(setFilter)(value) }}
         filterLabel="Filter by payout status"
         renderFilter={(f) => `${filterLabel(f)} (${f === 'All' ? allCount : counts[f] ?? 0})`}
       />
 
+      <ListFilters fields={[{ key: 'status', label: 'Exact statuses (multiple)', multiple: true, options: Object.keys(PAYOUT_STATUS) }]} onApply={(values) => { setStatuses(values.status || []); setFilter('All'); setPage(1) }} />
       <div className="flex flex-wrap items-center gap-3 text-[13px] text-muted">
         <label className="flex items-center gap-2">
           From
@@ -195,6 +210,8 @@ const Payouts = () => {
         <span>Dates are in UTC.</span>
       </div>
 
+      {loading && <p role="status">Loading payouts…</p>}
+      {error && <p role="alert" className="text-rose-600">Couldn’t load payouts: {error}</p>}
       <AdminTable
         columns={columns}
         rows={payouts}
@@ -207,14 +224,14 @@ const Payouts = () => {
         <AdminModal
           title={`Payout · ${selected.worker?.fullName || 'Worker'}`}
           subtitle={`Requested ${formatDateTime(selected.createdAt)}`}
-          onClose={() => setSelected(null)}
+          onClose={closeDetail}
           footer={
-            <button type="button" className="btn btn-primary" onClick={() => setSelected(null)}>
+            <button type="button" className="btn btn-primary" onClick={closeDetail}>
               Close
             </button>
           }
         >
-          {detailError && <p className="text-[13px] text-rose-600">Couldn&apos;t load this payout: {detailError}</p>}
+          {detailError && <p className="text-[13px] text-rose-600">Couldn&apos;t load this payout: {detailError} <button className="btn btn-sm btn-outline" onClick={() => openDetail(selected)}>Retry</button></p>}
           {!detail && !detailError && <p className="text-[13px] text-muted">Loading…</p>}
           {detail && (
             <>

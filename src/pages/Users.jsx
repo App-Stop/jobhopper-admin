@@ -1,9 +1,12 @@
-import { useState, useEffect, useMemo } from 'react'
-import { UserCheck, UserX } from 'lucide-react'
-import { AdminHeader, AdminTable, AdminToolbar, NameCell, RefreshButton, StatusPill } from './AdminParts'
-import { apiRequest, apiRequestAll } from '../api/client'
+import { useRef, useState } from 'react'
+import { Eye, UserCheck, UserX } from 'lucide-react'
+import { AdminHeader, AdminTable, AdminToolbar, NameCell, Pager, RefreshButton, StatusPill } from './AdminParts'
+import { apiRequest } from '../api/client'
+import UserDetails from './UserDetails'
+import useAdminList from '../hooks/useAdminList'
+import ListFilters from './ListFilters'
 
-const FILTERS = ['All', 'Workers', 'Clients', 'Active', 'Deactivated']
+const FILTERS = ['All', 'Workers', 'Clients']
 
 // `profiles` lists what the account can act as; a dual-profile account has both.
 const isWorker = (u) => (u.profiles || []).includes('worker')
@@ -16,31 +19,23 @@ const roleLabel = (u) => {
 }
 
 const Users = () => {
-  const [users, setUsers] = useState([])
-  const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('All')
+  const [filters, setFilters] = useState({})
+  const { rows: users, counts, pagination, query, setQuery, page, setPage, error, loading, refresh: loadUsers } = useAdminList('/admin/users', 'users', { ...filters, role: filter === 'Workers' ? 'worker' : filter === 'Clients' ? 'client' : '' })
   const [actionLoading, setActionLoading] = useState(null)
-  const [error, setError] = useState(null)
-
-  const loadUsers = async () => {
-    try {
-      setUsers(await apiRequestAll('/admin/users', 'users'))
-      setError(null)
-    } catch (err) {
-      setError(err.message)
-    }
-  }
-
-  useEffect(() => {
-    loadUsers()
-  }, [])
+  const [selectedUserId, setSelectedUserId] = useState(null)
+  const [actionError, setActionError] = useState('')
+  const actionBusy = useRef(false)
 
   const handleToggleDeactivate = async (user) => {
+    if (actionBusy.current) return
     const nextState = !user.isDeactivated
     if (!window.confirm(`Are you sure you want to ${nextState ? 'deactivate' : 'reactivate'} ${user.fullName || user.email}?${nextState ? ' They will be signed out of every device.' : ''}`)) {
       return
     }
 
+    actionBusy.current = true
+    setActionError('')
     setActionLoading(user._id)
     try {
       await apiRequest(`/admin/users/${user._id}/deactivate`, {
@@ -49,29 +44,12 @@ const Users = () => {
       })
       loadUsers()
     } catch (err) {
-      alert(err.message || 'Action failed')
+      setActionError(err.message || 'Action failed')
     } finally {
+      actionBusy.current = false
       setActionLoading(null)
     }
   }
-
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return users.filter((u) => {
-      let matchesFilter = true
-      if (filter === 'Workers') matchesFilter = isWorker(u)
-      else if (filter === 'Clients') matchesFilter = isClient(u)
-      else if (filter === 'Active') matchesFilter = !u.isDeactivated
-      else if (filter === 'Deactivated') matchesFilter = u.isDeactivated
-
-      const name = u.fullName || ''
-      const email = u.email || ''
-      const phone = u.phone || ''
-      const matchesQuery = !q || [name, email, phone].some((f) => f.toLowerCase().includes(q))
-
-      return matchesFilter && matchesQuery
-    })
-  }, [users, query, filter])
 
   const columns = [
     {
@@ -128,9 +106,10 @@ const Users = () => {
       align: 'right',
       render: (u) => (
         <div className="admin-row-actions">
+          <button type="button" className="btn btn-sm btn-outline" onClick={() => setSelectedUserId(u._id)}><Eye strokeWidth={2} /> View</button>
           <button
             type="button"
-            disabled={actionLoading === u._id}
+            disabled={!!actionLoading}
             className={`btn btn-sm ${u.isDeactivated ? 'btn-success' : 'btn-danger'}`}
             onClick={() => handleToggleDeactivate(u)}
           >
@@ -142,15 +121,15 @@ const Users = () => {
     },
   ]
 
-  const workerCount = users.filter(isWorker).length
-  const clientCount = users.filter(isClient).length
+  const workerCount = counts.workers ?? 0
+  const clientCount = counts.clients ?? 0
 
   return (
     <div className="admin-page">
       <AdminHeader
         title="Users"
-        count={users.length}
-        subtitle={`${workerCount} tradespeople and ${clientCount} clients registered on the marketplace (dual-profile accounts count as both).`}
+        count={pagination?.total ?? users.length}
+        subtitle={`${workerCount} tradespeople and ${clientCount} clients matching the current search and filters (dual-profile accounts count as both).`}
         actions={<RefreshButton onRefresh={loadUsers} />}
       />
 
@@ -160,15 +139,25 @@ const Users = () => {
         placeholder="Search by name, email or phone"
         filters={FILTERS}
         filter={filter}
-        onFilter={setFilter}
+        onFilter={(value) => { setFilter(value); setPage(1) }}
+        renderFilter={(value) => `${value} (${counts[value === 'All' ? 'all' : value === 'Workers' ? 'workers' : 'clients'] ?? 0})`}
         filterLabel="Filter by role or status"
       />
 
+      <ListFilters onApply={(values) => { setFilters(values); setPage(1) }} fields={[
+        { key: 'isDeactivated', label: 'Account status', options: [{ value: 'false', label: 'Active' }, { value: 'true', label: 'Deactivated' }] },
+        { key: 'joinedFrom', label: 'Joined from', type: 'date' }, { key: 'joinedTo', label: 'Joined to', type: 'date' },
+      ]} />
+      {loading && <p role="status">Loading users…</p>}
+      {error && <p role="alert" className="text-rose-600">Couldn’t load users: {error}</p>}
+      {actionError && <p role="alert" className="text-rose-600">Couldn’t update user: {actionError}</p>}
       <AdminTable
         columns={columns}
-        rows={rows}
+        rows={users}
         empty={error ? `Couldn't load users: ${error}` : 'No user accounts match your search.'}
       />
+      <Pager page={page} totalPages={pagination?.totalPages ?? 1} onPage={setPage} />
+      {selectedUserId && <UserDetails key={selectedUserId} userId={selectedUserId} onClose={() => setSelectedUserId(null)} />}
     </div>
   )
 }

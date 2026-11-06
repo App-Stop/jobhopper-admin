@@ -66,7 +66,7 @@
 }
 
 .admin-nav {
-  @apply flex lg:flex-col gap-1 lg:flex-1 overflow-x-auto lg:overflow-visible;
+  @apply flex lg:flex-col gap-1 lg:flex-1 min-w-0 lg:min-h-0 overflow-x-auto lg:overflow-x-hidden lg:overflow-y-auto;
 }
 
 .admin-nav-link {

@@ -50,8 +50,9 @@ export async function apiRequest(endpoint, options = {}) {
   let res
   try {
     res = await fetch(`${API_URL}${endpoint}`, { ...options, headers })
-  } catch {
-    throw new Error(`Cannot reach the JobHopper server at ${API_URL}.`)
+  } catch (err) {
+    if (err.name === 'AbortError') throw err
+    throw new Error(`Cannot reach the JobHopper server at ${API_URL}.`, { cause: err })
   }
 
   const json = await res.json().catch(() => null)
@@ -90,8 +91,13 @@ export async function apiFileObjectUrl(fileId) {
     res = await fetch(`${API_URL}/files/${fileId}/content`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
-  } catch {
-    throw new Error(`Cannot reach the JobHopper server at ${API_URL}.`)
+  } catch (err) {
+    if (err.name === 'AbortError') throw err
+    throw new Error(`Cannot reach the JobHopper server at ${API_URL}.`, { cause: err })
+  }
+  if (res.status === 401 && token) {
+    clearAuth()
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
   }
   if (!res.ok) {
     const json = await res.json().catch(() => null)
@@ -111,7 +117,8 @@ export async function apiRequestAll(endpoint, key, params = {}) {
   for (let page = 1; ; page++) {
     const query = new URLSearchParams({ ...params, page, limit: PAGE_LIMIT })
     const res = await apiRequest(`${endpoint}?${query}`)
-    items.push(...(res?.data?.[key] || []))
+    if (!Array.isArray(res?.data?.[key])) throw new Error('Unexpected list response from the server. Please try again.')
+    items.push(...res.data[key])
     if (page >= (res?.data?.pagination?.totalPages ?? 1)) return items
   }
 }

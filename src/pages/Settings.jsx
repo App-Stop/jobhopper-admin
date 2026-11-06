@@ -164,12 +164,14 @@ const FIELD_OPTION_LISTS = [
 const FieldOptions = () => {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
+    setError(null)
     apiRequest('/admin/field-options')
       .then((res) => setData(res?.data || {}))
       .catch((err) => setError(err.message))
-  }, [])
+  }, [attempt])
 
   return (
     <section className="admin-card">
@@ -186,7 +188,7 @@ const FieldOptions = () => {
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-5">
-        {error && <p className="text-[13px] text-rose-600">Couldn&apos;t load the choice lists: {error}</p>}
+        {error && <p className="text-[13px] text-rose-600">Couldn&apos;t load the choice lists: {error} <button className="btn btn-sm btn-outline" onClick={() => setAttempt((value) => value + 1)}>Retry</button></p>}
         {!data && !error && <p className="text-[13px] text-muted">Loading…</p>}
         {data &&
           FIELD_OPTION_LISTS.map(([title, pick]) => (
@@ -217,6 +219,7 @@ const Settings = () => {
   // Editing stays locked until the live values load, so a save can never write DEFAULTS over real rates.
   const [loaded, setLoaded] = useState(false)
   const [loadError, setLoadError] = useState(null)
+  const [loadAttempt, setLoadAttempt] = useState(0)
 
   // Simulator inputs (not persisted)
   const [testAmount, setTestAmount] = useState(150)
@@ -224,9 +227,11 @@ const Settings = () => {
 
   useEffect(() => {
     const load = async () => {
+      setLoadError(null)
       try {
         const res = await apiRequest('/admin/settings')
         const d = res?.data || {}
+        if (KEYS.some((key) => typeof d[key] !== 'number') || typeof d.veriffEnabled !== 'boolean') throw new Error('The server returned incomplete platform settings.')
         const live = Object.fromEntries(KEYS.map((k) => [k, d[k] ?? DEFAULTS[k]]))
         setValues(live)
         setBaseline(live)
@@ -238,7 +243,7 @@ const Settings = () => {
       }
     }
     load()
-  }, [])
+  }, [loadAttempt])
 
   const isChanged = (key) => num(values[key]) !== num(baseline[key]) || values[key] === ''
   const veriffChanged = veriff !== veriffBaseline
@@ -335,7 +340,7 @@ const Settings = () => {
         <form id="fee-settings" onSubmit={handleSave} className="admin-settings-groups">
           {loadError && (
             <p className="rounded-[14px] border border-rose-200 bg-rose-50 px-4 py-3 text-[13.5px] text-rose-700" role="alert">
-              Couldn't load the current fee settings: {loadError} Editing is disabled until the page is reloaded.
+              Couldn't load the current fee settings: {loadError} Editing is disabled until settings load. <button type="button" className="btn btn-sm btn-outline" onClick={() => setLoadAttempt((value) => value + 1)}>Retry</button>
             </p>
           )}
           {GROUPS.map(({ title, hint, icon: Icon, fields }) => (
@@ -366,7 +371,7 @@ const Settings = () => {
                     value={values[key]}
                     onChange={setField(key)}
                     changed={isChanged(key)}
-                    disabled={!loaded}
+                    disabled={!loaded || saving}
                     {...input}
                   />
                 </div>
@@ -398,7 +403,7 @@ const Settings = () => {
                 aria-label="Automatic checks with Veriff"
                 className="size-5 accent-primary cursor-pointer"
                 checked={veriff}
-                disabled={!loaded}
+                disabled={!loaded || saving}
                 onChange={(e) => {
                   setVeriff(e.target.checked)
                   setStatus(null)

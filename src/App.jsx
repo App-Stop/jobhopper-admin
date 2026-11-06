@@ -11,6 +11,7 @@ import Settings from './pages/Settings'
 import Payouts from './pages/Payouts'
 import OpenRequests from './pages/OpenRequests'
 import Account from './pages/Account'
+import Moderation from './pages/Moderation'
 import { adminLogout, fetchAdminProfile, getAdminSession } from './services/adminAuth'
 import { currentAdminPage } from './navigation'
 import { UNAUTHORIZED_EVENT } from './api/client'
@@ -61,6 +62,8 @@ const App = () => {
       {page === 'openRequests' && <OpenRequests />}
       {page === 'payouts' && <Payouts />}
       {page === 'disputes' && <Disputes />}
+      {page === 'supportTickets' && <Moderation key="support" kind="support-tickets" />}
+      {page === 'userReports' && <Moderation key="reports" kind="user-reports" />}
       {page === 'categories' && <Categories />}
       {page === 'settings' && <Settings />}
       {page === 'account' && <Account session={session} />}

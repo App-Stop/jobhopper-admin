@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Eye, Gavel, MessageSquarePlus, Search as SearchIcon } from 'lucide-react'
-import { AdminHeader, AdminModal, AdminTable, AdminToolbar, FileImage, NameCell, RefreshButton, StatusPill } from './AdminParts'
-import { apiRequest, apiRequestAll } from '../api/client'
+import { AdminHeader, AdminModal, AdminTable, AdminToolbar, FileImage, NameCell, Pager, RefreshButton, StatusPill } from './AdminParts'
+import { apiRequest } from '../api/client'
+import useAdminList from '../hooks/useAdminList'
 import { formatDate, formatDateTime, formatMoney } from '../constants'
 
 // Backend dispute statuses: open → under_review ⇄ awaiting_response → resolved.
@@ -53,10 +54,12 @@ const Party = ({ label, person }) => (
 )
 
 const Disputes = () => {
-  const [reports, setReports] = useState([])
-  const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('All')
-  const [error, setError] = useState(null)
+  const { rows: reports, pagination, query, setQuery, page, setPage, error, loading, refresh: loadReports } = useAdminList('/admin/disputes', 'reports', { status: FILTER_STATUSES[filter] || '' })
+  const [actionError, setActionError] = useState('')
+  const detailRequest = useRef(0)
+  const actionBusy = useRef(false)
+  useEffect(() => () => { detailRequest.current++ }, [])
 
   // Detail modal
   const [selectedId, setSelectedId] = useState(null)
@@ -68,30 +71,21 @@ const Disputes = () => {
   const [refundAmount, setRefundAmount] = useState('')
   const [resolutionNote, setResolutionNote] = useState('')
 
-  const loadReports = async () => {
-    try {
-      setReports(await apiRequestAll('/admin/disputes', 'reports'))
-      setError(null)
-    } catch (err) {
-      setError(err.message)
-    }
-  }
-
-  useEffect(() => {
-    loadReports()
-  }, [])
-
   const loadDetail = async (id) => {
+    const request = ++detailRequest.current
     try {
       const res = await apiRequest(`/admin/disputes/${id}`)
-      setDetail(res?.data || null)
+      if (request !== detailRequest.current) return
+      if (!res?.data?.filing) throw new Error('Unexpected dispute response from the server.')
+      setDetail(res.data)
       setDetailError(null)
     } catch (err) {
-      setDetailError(err.message)
+      if (request === detailRequest.current) setDetailError(err.message)
     }
   }
 
   const openDetail = (r) => {
+    setActionError('')
     setSelectedId(r._id)
     setDetail(null)
     setDetailError(null)
@@ -103,12 +97,17 @@ const Disputes = () => {
   }
 
   const closeDetail = () => {
+    if (actionBusy.current) return
+    detailRequest.current++
     setSelectedId(null)
     setDetail(null)
   }
 
   // Runs an action, then refreshes both the detail and the list.
   const act = async (fn) => {
+    if (actionBusy.current) return false
+    actionBusy.current = true
+    setActionError('')
     setBusy(true)
     try {
       const res = await fn()
@@ -117,9 +116,10 @@ const Disputes = () => {
       loadReports()
       return true
     } catch (err) {
-      alert(err.message || 'Action failed')
+      setActionError(err.message || 'Action failed')
       return false
     } finally {
+      actionBusy.current = false
       setBusy(false)
     }
   }
@@ -172,16 +172,6 @@ const Disputes = () => {
       }),
     )
   }
-
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return reports.filter((r) => {
-      const matchesFilter = filter === 'All' || r.status === FILTER_STATUSES[filter]
-      const fields = [r.reason, r.description, r.job?.jobCode, r.client?.fullName, r.worker?.fullName]
-      const matchesQuery = !q || fields.some((f) => (f || '').toLowerCase().includes(q))
-      return matchesFilter && matchesQuery
-    })
-  }, [reports, query, filter])
 
   const columns = [
     {
@@ -244,7 +234,6 @@ const Disputes = () => {
     },
   ]
 
-  const openCount = reports.filter((r) => r.status !== 'resolved').length
   const resolved = detail?.status === 'resolved'
   const jobDisputed = detail?.job?.status === 'disputed'
   const openRequestFor = (party) => detail?.requests?.some((q) => q.party === party && q.state === 'open')
@@ -253,27 +242,30 @@ const Disputes = () => {
     <div className="admin-page">
       <AdminHeader
         title="Disputes"
-        count={reports.length}
-        subtitle={`${openCount} disputes awaiting a decision. Gather evidence from both sides, then split the held service fee.`}
+        count={pagination?.total ?? reports.length}
+        subtitle="Gather evidence from both sides, then split the held service fee."
         actions={<RefreshButton onRefresh={loadReports} />}
       />
 
       <AdminToolbar
         query={query}
         onQuery={setQuery}
-        placeholder="Search reason, job code, client or worker"
+        placeholder="Search job code, client or worker contact"
         filters={FILTERS}
         filter={filter}
-        onFilter={setFilter}
+        onFilter={(value) => { setFilter(value); setPage(1) }}
         filterLabel="Filter by dispute status"
       />
 
+      {loading && <p role="status">Loading disputes…</p>}
+      {error && <p role="alert" className="text-rose-600">Couldn’t load disputes: {error}</p>}
       <AdminTable
         columns={columns}
-        rows={rows}
+        rows={reports}
         empty={error ? `Couldn't load disputes: ${error}` : 'No disputes match your filter.'}
       />
 
+      <Pager page={page} totalPages={pagination?.totalPages ?? 1} onPage={setPage} />
       {selectedId && (
         <AdminModal
           size="max-w-3xl"
@@ -293,7 +285,8 @@ const Disputes = () => {
             </>
           }
         >
-          {detailError && <p className="text-[13px] text-rose-600">Couldn&apos;t load this dispute: {detailError}</p>}
+          {actionError && <p role="alert" className="text-rose-600">{actionError} <button type="button" className="btn btn-sm btn-outline" disabled={busy} onClick={() => loadDetail(selectedId)}>Refresh details</button></p>}
+          {detailError && <p role="alert" className="text-[13px] text-rose-600">Couldn&apos;t load this dispute: {detailError} <button className="btn btn-sm btn-outline" onClick={() => loadDetail(selectedId)}>Retry</button></p>}
           {!detail && !detailError && <p className="text-[13px] text-muted">Loading…</p>}
 
           {detail && (

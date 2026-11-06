@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
-import { AdminHeader, AdminModal, AdminTable, AdminToolbar, NameCell, RefreshButton, StatusPill } from './AdminParts'
+import { AdminHeader, AdminModal, AdminTable, AdminToolbar, FileImage, NameCell, RefreshButton, StatusPill } from './AdminParts'
 import { apiRequest, apiRequestAll } from '../api/client'
 
 const FILTERS = ['All', 'Active', 'Inactive']
@@ -16,6 +16,10 @@ const Categories = () => {
   const [isActive, setIsActive] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [actionError, setActionError] = useState('')
+  const [sortOrder, setSortOrder] = useState(0)
+  const [icon, setIcon] = useState(null)
+  const busy = useRef(false)
 
   const loadCategories = async () => {
     try {
@@ -36,6 +40,9 @@ const Categories = () => {
     setName('')
     setDescription('')
     setIsActive(true)
+    setSortOrder(0)
+    setActionError('')
+    setIcon(null)
     setModalOpen(true)
   }
 
@@ -44,42 +51,48 @@ const Categories = () => {
     setName(c.name)
     setDescription(c.description || '')
     setIsActive(c.isActive !== false)
+    setSortOrder(c.sortOrder ?? 0)
+    setActionError('')
+    setIcon(null)
     setModalOpen(true)
   }
 
   const handleDelete = async (catId, catName) => {
     if (!window.confirm(`Delete trade category "${catName}"?`)) return
+    if (busy.current) return
+    busy.current = true
+    setLoading(true)
+    setActionError('')
     try {
       await apiRequest(`/categories/${catId}`, { method: 'DELETE' })
       loadCategories()
     } catch (err) {
-      alert(err.message || 'Delete failed')
-    }
+      setActionError(err.message || 'Delete failed')
+    } finally { busy.current = false; setLoading(false) }
   }
 
   const handleSave = async (e) => {
     e.preventDefault()
     if (!name.trim()) return
+    if (busy.current) return
+    if (icon && icon.size > 25 * 1024 * 1024) { setActionError('The icon must be 25 MB or smaller.'); return }
+    busy.current = true
     setLoading(true)
+    setActionError('')
     try {
-      if (editingCat) {
-        await apiRequest(`/categories/${editingCat._id}`, {
-          method: 'PATCH',
-          // isActive is validated as the string 'true' | 'false' (the route also accepts multipart).
-          body: JSON.stringify({ name: name.trim(), description: description.trim(), isActive: String(isActive) }),
-        })
-      } else {
-        await apiRequest('/categories', {
-          method: 'POST',
-          // isActive is validated as the string 'true' | 'false' (the route also accepts multipart).
-          body: JSON.stringify({ name: name.trim(), description: description.trim(), isActive: String(isActive) }),
-        })
-      }
+      const body = new FormData()
+      body.set('name', name.trim())
+      body.set('description', description.trim())
+      body.set('isActive', String(isActive))
+      body.set('sortOrder', String(sortOrder))
+      if (icon) body.set('icon', icon)
+      await apiRequest(editingCat ? `/categories/${editingCat._id}` : '/categories', { method: editingCat ? 'PATCH' : 'POST', body })
       setModalOpen(false)
       loadCategories()
     } catch (err) {
-      alert(err.message || 'Save failed')
+      setActionError(err.message || 'Save failed')
     } finally {
+      busy.current = false
       setLoading(false)
     }
   }
@@ -108,6 +121,8 @@ const Categories = () => {
         />
       ),
     },
+    { key: 'icon', label: 'Icon', render: (c) => c.icon && <FileImage key={c.icon._id} file={c.icon} className="size-10" /> },
+    { key: 'sortOrder', label: 'Sort order' },
     {
       key: 'description',
       label: 'Description',
@@ -128,13 +143,13 @@ const Categories = () => {
       align: 'right',
       render: (c) => (
         <div className="admin-row-actions">
-          <button type="button" className="btn btn-sm btn-outline" onClick={() => handleOpenEdit(c)}>
+          <button type="button" className="btn btn-sm btn-outline" disabled={loading} onClick={() => handleOpenEdit(c)}>
             <Pencil strokeWidth={2} /> Edit
           </button>
           <button
             type="button"
             className="btn btn-sm btn-danger btn-icon"
-            onClick={() => handleDelete(c._id, c.name)}
+            disabled={loading} onClick={() => handleDelete(c._id, c.name)}
             aria-label={`Delete ${c.name}`}
             title="Delete"
           >
@@ -156,7 +171,7 @@ const Categories = () => {
         actions={
           <>
             <RefreshButton onRefresh={loadCategories} />
-            <button type="button" className="btn btn-primary" onClick={handleOpenAdd}>
+            <button type="button" className="btn btn-primary" disabled={loading} onClick={handleOpenAdd}>
               <Plus strokeWidth={2} /> Add category
             </button>
           </>
@@ -173,6 +188,8 @@ const Categories = () => {
         filterLabel="Filter by category status"
       />
 
+      {error && <p role="alert" className="text-rose-600">Couldn’t load categories: {error}</p>}
+      {actionError && !modalOpen && <p role="alert" className="text-rose-600">{actionError}</p>}
       <AdminTable
         columns={columns}
         rows={rows}
@@ -186,10 +203,10 @@ const Categories = () => {
           size="max-w-md"
           title={editingCat ? 'Edit trade category' : 'New trade category'}
           subtitle={editingCat ? `/${editingCat.slug || editingCat.name.toLowerCase().replace(/\s+/g, '-')}` : 'Shown to clients when posting a job.'}
-          onClose={() => setModalOpen(false)}
+          onClose={() => { if (!busy.current) setModalOpen(false) }}
           footer={
             <>
-              <button type="button" className="btn btn-outline" onClick={() => setModalOpen(false)}>
+              <button type="button" className="btn btn-outline" disabled={loading} onClick={() => setModalOpen(false)}>
                 Cancel
               </button>
               <button type="submit" className="btn btn-primary" disabled={loading}>
@@ -199,6 +216,9 @@ const Categories = () => {
           }
         >
           <div className="modal-fields">
+            {actionError && <p role="alert" className="text-rose-600">{actionError}</p>}
+            <label className="modal-field"><span className="modal-field-label">Sort order</span><input className="modal-field-input" type="number" min="0" step="1" required value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} /></label>
+            <label className="modal-field"><span className="modal-field-label">Category icon (optional, up to 25 MB)</span>{editingCat?.icon && <FileImage file={editingCat.icon} className="size-16" />}<input key={editingCat?._id || 'new'} type="file" accept="image/*" onChange={(e) => setIcon(e.target.files?.[0] || null)} /></label>
             <label className="modal-field">
               <span className="modal-field-label">Category name</span>
               <input

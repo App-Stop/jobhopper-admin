@@ -8,6 +8,8 @@ export const adminPaths = {
   payouts: '/payouts',
   disputes: '/disputes',
   categories: '/categories',
+  supportTickets: '/support-tickets',
+  userReports: '/user-reports',
   settings: '/settings',
   account: '/account',
 }

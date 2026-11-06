@@ -45,6 +45,7 @@ export const AdminToolbar = ({ query, onQuery, placeholder, filters, filter, onF
       <Search strokeWidth={1.5} />
       <input
         type="search"
+        maxLength={100}
         aria-label={placeholder}
         placeholder={placeholder}
         value={query}

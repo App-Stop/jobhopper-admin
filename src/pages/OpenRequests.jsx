@@ -52,6 +52,10 @@ const OpenRequests = () => {
   const [detail, setDetail] = useState(null)
   const [detailError, setDetailError] = useState(null)
   const requestId = useRef(0)
+  const detailRequest = useRef(0)
+  const [loading, setLoading] = useState(false)
+  useEffect(() => () => { requestId.current++; detailRequest.current++ }, [])
+  const closeDetail = () => { detailRequest.current++; setSelected(null) }
 
   useEffect(() => {
     const next = query.trim()
@@ -65,6 +69,8 @@ const OpenRequests = () => {
 
   const load = async () => {
     const id = ++requestId.current
+    setLoading(true)
+    setError(null)
     const params = new URLSearchParams({ page, limit: PAGE_SIZE })
     if (search) params.set('search', search)
     if (POST_TYPES[filter]) params.set('postType', POST_TYPES[filter])
@@ -72,13 +78,14 @@ const OpenRequests = () => {
     try {
       const res = await apiRequest(`/admin/open-requests?${params}`)
       if (id !== requestId.current) return
-      setRequests(res?.data?.requests || [])
+      if (!Array.isArray(res?.data?.requests)) throw new Error('Unexpected list response from the server.')
+      setRequests(res.data.requests)
       setCounts(res?.data?.counts || {})
       setPagination(res?.data?.pagination || null)
       setError(null)
     } catch (err) {
       if (id === requestId.current) setError(err.message)
-    }
+    } finally { if (id === requestId.current) setLoading(false) }
   }
 
   useEffect(() => {
@@ -87,14 +94,17 @@ const OpenRequests = () => {
   }, [page, search, filter, urgency])
 
   const openDetail = async (r) => {
+    const id = ++detailRequest.current
     setSelected(r)
     setDetail(null)
     setDetailError(null)
     try {
       const res = await apiRequest(`/admin/open-requests/${r._id}`)
-      setDetail(res?.data || null)
+      if (id !== detailRequest.current) return
+      if (!res?.data?._id) throw new Error('Unexpected detail response from the server.')
+      setDetail(res.data)
     } catch (err) {
-      setDetailError(err.message)
+      if (id === detailRequest.current) setDetailError(err.message)
     }
   }
 
@@ -213,6 +223,8 @@ const OpenRequests = () => {
         </select>
       </label>
 
+      {loading && <p role="status">Loading open requests…</p>}
+      {error && <p role="alert" className="text-rose-600">Couldn’t load open requests: {error}</p>}
       <AdminTable
         columns={columns}
         rows={requests}
@@ -228,7 +240,7 @@ const OpenRequests = () => {
           subtitle={[selected.postType === 'direct_hire' ? 'Direct hire' : 'Open post', categoryNames(selected).join(', ')]
             .filter(Boolean)
             .join(' · ')}
-          onClose={() => setSelected(null)}
+          onClose={closeDetail}
           footer={
             <>
               <p className="mr-auto text-[13px] text-muted">
@@ -236,13 +248,13 @@ const OpenRequests = () => {
                 <span className="ml-2 text-[17px] font-bold tabular-nums text-primary">{formatMoney(selected.budget)}</span>
                 {detail?.priorityFee > 0 && <span className="ml-1.5">+ {formatMoney(detail.priorityFee)} priority</span>}
               </p>
-              <button type="button" className="btn btn-primary" onClick={() => setSelected(null)}>
+              <button type="button" className="btn btn-primary" onClick={closeDetail}>
                 Close
               </button>
             </>
           }
         >
-          {detailError && <p className="text-[13px] text-rose-600">Couldn&apos;t load this request: {detailError}</p>}
+          {detailError && <p className="text-[13px] text-rose-600">Couldn&apos;t load this request: {detailError} <button className="btn btn-sm btn-outline" onClick={() => openDetail(selected)}>Retry</button></p>}
           {!detail && !detailError && <p className="text-[13px] text-muted">Loading…</p>}
           {detail && (
             <>

@@ -1,10 +1,12 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Eye, MapPin, Zap } from 'lucide-react'
-import { AdminHeader, AdminModal, AdminTable, AdminToolbar, NameCell, RefreshButton, StatusPill } from './AdminParts'
-import { apiRequestAll } from '../api/client'
+import { AdminHeader, AdminModal, AdminTable, AdminToolbar, NameCell, Pager, FileImage, RefreshButton, StatusPill } from './AdminParts'
+import { apiRequest } from '../api/client'
+import useAdminList from '../hooks/useAdminList'
+import ListFilters from './ListFilters'
 import { ACTIVE_JOB_STATUSES, JOB_STATUS_GROUPS as FILTER_STATUSES, categoryNames, formatDateTime as formatDate, formatMoney as money } from '../constants'
 
-const FILTERS = ['All', ...Object.keys(FILTER_STATUSES)]
+const FILTERS = ['All', ...Object.keys(FILTER_STATUSES).filter((key) => key !== 'Open')]
 
 const URGENCY_LABELS = { standard: 'Standard', within_24h: 'Within 24h', asap: 'ASAP' }
 
@@ -17,36 +19,32 @@ const formatAddress = (a) =>
 const jobAmount = (j) => j.finalAmount ?? j.budget
 
 const Jobs = () => {
-  const [jobs, setJobs] = useState([])
-  const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('All')
+  const [filters, setFilters] = useState({})
+  const { rows: jobs, counts, pagination, query, setQuery, page, setPage, error, loading, refresh: loadJobs } = useAdminList('/admin/jobs', 'jobs', { ...filters, status: filters.status?.length ? filters.status.join(',') : filter === 'All' ? '' : FILTER_STATUSES[filter].join(',') })
   const [selectedJob, setSelectedJob] = useState(null)
-  const [error, setError] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState('')
+  const detailRequest = useRef(0)
 
-  const loadJobs = async () => {
+  useEffect(() => () => { detailRequest.current++ }, [])
+  const closeDetail = () => { detailRequest.current++; setSelectedJob(null) }
+  const openDetail = async (job) => {
+    const id = ++detailRequest.current
+    setSelectedJob(job)
+    setDetailLoading(true)
+    setDetailError('')
     try {
-      setJobs(await apiRequestAll('/admin/jobs', 'jobs'))
-      setError(null)
+      const res = await apiRequest(`/admin/jobs/${job._id}`)
+      if (!res?.data?._id) throw new Error('Unexpected response from the server.')
+      if (id === detailRequest.current) setSelectedJob(res.data)
     } catch (err) {
-      setError(err.message)
+      if (id === detailRequest.current) setDetailError(err.message)
+    } finally {
+      if (id === detailRequest.current) setDetailLoading(false)
     }
   }
 
-  useEffect(() => {
-    loadJobs()
-  }, [])
-
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return jobs.filter((j) => {
-      const matchesFilter = filter === 'All' || FILTER_STATUSES[filter].includes(j.status)
-
-      const fields = [j.jobCode, j.title, ...categoryNames(j), j.client?.fullName, j.worker?.fullName]
-      const matchesQuery = !q || fields.some((f) => (f || '').toLowerCase().includes(q))
-
-      return matchesFilter && matchesQuery
-    })
-  }, [jobs, query, filter])
 
   const columns = [
     {
@@ -102,7 +100,7 @@ const Jobs = () => {
       align: 'right',
       render: (j) => (
         <div className="admin-row-actions">
-          <button type="button" className="btn btn-sm btn-outline" onClick={() => setSelectedJob(j)}>
+          <button type="button" className="btn btn-sm btn-outline" onClick={() => openDetail(j)}>
             <Eye strokeWidth={2} /> View
           </button>
         </div>
@@ -110,13 +108,13 @@ const Jobs = () => {
     },
   ]
 
-  const activeCount = jobs.filter((j) => ACTIVE_JOB_STATUSES.includes(j.status)).length
+  const activeCount = ACTIVE_JOB_STATUSES.reduce((sum, status) => sum + (counts[status] || 0), 0)
 
   return (
     <div className="admin-page">
       <AdminHeader
-        title="Jobs & Orders"
-        count={jobs.length}
+        title="Jobs"
+        count={pagination?.total ?? jobs.length}
         subtitle={`${activeCount} jobs booked, in progress or awaiting the client's confirmation. Track orders from dispatch to completion and escrow release.`}
         actions={<RefreshButton onRefresh={loadJobs} />}
       />
@@ -124,24 +122,36 @@ const Jobs = () => {
       <AdminToolbar
         query={query}
         onQuery={setQuery}
-        placeholder="Search job code, title, trade, client or worker"
+        placeholder="Search job code, description, client or worker contact"
         filters={FILTERS}
         filter={filter}
-        onFilter={setFilter}
+        onFilter={(value) => { setFilter(value); setFilters((old) => ({ ...old, status: [] })); setPage(1) }}
         filterLabel="Filter by job status"
       />
 
+      <ListFilters fields={[
+        { key: 'status', label: 'Exact statuses (multiple)', multiple: true, options: Object.values(FILTER_STATUSES).flat().filter((status) => status !== 'open') },
+        { key: 'postType', label: 'Post type', options: ['open', 'direct_hire'] },
+        { key: 'urgency', label: 'Urgency', options: ['standard', 'within_24h', 'asap'] },
+        { key: 'from', label: 'Created from', type: 'date' }, { key: 'to', label: 'Created to', type: 'date' },
+        { key: 'scheduledFrom', label: 'Scheduled from', type: 'date' }, { key: 'scheduledTo', label: 'Scheduled to', type: 'date' },
+        { key: 'clientId', label: 'Client account ID', pattern: '[a-fA-F0-9]{24}', title: '24-character account ID' },
+        { key: 'workerId', label: 'Worker account ID', pattern: '[a-fA-F0-9]{24}', title: '24-character account ID' },
+      ]} onApply={(values) => { setFilters(values); setFilter('All'); setPage(1) }} />
+      {loading && <p role="status">Loading jobs…</p>}
+      {error && <p role="alert" className="text-rose-600">Couldn’t load jobs: {error}</p>}
       <AdminTable
         columns={columns}
-        rows={rows}
+        rows={jobs}
         empty={error ? `Couldn't load jobs: ${error}` : 'No jobs match your search.'}
       />
 
+      <Pager page={page} totalPages={pagination?.totalPages ?? 1} onPage={setPage} />
       {selectedJob && (
         <AdminModal
           title={selectedJob.jobCode || 'Job'}
           subtitle={[selectedJob.title, categoryNames(selectedJob).join(', ')].filter(Boolean).join(' · ')}
-          onClose={() => setSelectedJob(null)}
+          onClose={closeDetail}
           footer={
             <>
               <p className="mr-auto text-[13px] text-muted">
@@ -153,12 +163,15 @@ const Jobs = () => {
                   <span className="ml-1.5">+ {money(selectedJob.priorityFee)} priority</span>
                 )}
               </p>
-              <button type="button" className="btn btn-primary" onClick={() => setSelectedJob(null)}>
+              <button type="button" className="btn btn-primary" onClick={closeDetail}>
                 Close
               </button>
             </>
           }
         >
+          {detailLoading && <p role="status">Loading job details…</p>}
+          {detailError && <p role="alert" className="text-rose-600">Couldn’t load job details: {detailError} <button className="btn btn-sm btn-outline" onClick={() => openDetail(selectedJob)}>Retry</button></p>}
+          {!detailLoading && !detailError && <>
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={selectedJob.status} />
             {selectedJob.urgency && (
@@ -175,17 +188,7 @@ const Jobs = () => {
             </div>
           )}
 
-          {selectedJob.photos?.some((p) => p?.location) && (
-            <div className="grid grid-cols-3 gap-2">
-              {selectedJob.photos
-                .filter((p) => p?.location)
-                .map((p) => (
-                  <a key={p._id} href={p.location} target="_blank" rel="noreferrer" className="aspect-square overflow-hidden rounded-xl border border-line">
-                    <img src={p.location} alt={p.filename || 'Job photo'} className="size-full object-cover" />
-                  </a>
-                ))}
-            </div>
-          )}
+          {selectedJob.photos?.length > 0 && <div className="grid grid-cols-3 gap-2">{selectedJob.photos.map((photo) => <FileImage key={photo._id} file={photo} className="aspect-square" />)}</div>}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="admin-info-box">
@@ -214,12 +217,34 @@ const Jobs = () => {
             </div>
           </div>
 
-          {selectedJob.cancelReason && (
-            <div className="admin-info-box border-rose-200 bg-rose-50/50">
-              <p className="admin-info-label">Cancellation reason</p>
-              <p className="text-dark-900">{selectedJob.cancelReason}</p>
-            </div>
-          )}
+          <div className="admin-info-box"><p className="admin-info-label">Lifecycle</p><div className="grid grid-cols-2 gap-3">{Object.entries({ requestExpiresAt: 'Request deadline', paymentExpiresAt: 'Payment deadline', confirmationExpiresAt: 'Confirmation deadline', arrivedAt: 'Arrived', startedAt: 'Started', completedAt: 'Completed', paidAt: 'Paid', updatedAt: 'Updated' }).map(([key, label]) => <div key={key}><p className="admin-info-label">{label}</p><p>{formatDate(selectedJob[key])}</p></div>)}</div></div>
+          {selectedJob.payment ? <div className="admin-info-box">
+            <p className="admin-info-label">Payment</p>
+            <p>{selectedJob.payment.status || 'Unknown'} · Escrow: {selectedJob.payment.escrowStatus || '—'}</p>
+            {['serviceFee', 'platformFee', 'priorityFee', 'tax', 'total', 'refundedAmount'].map((key) => <p key={key}>{({ serviceFee: 'Service fee', platformFee: 'Platform fee', priorityFee: 'Priority fee', tax: 'Tax', total: 'Total', refundedAmount: 'Refunded' })[key]}: {money(selectedJob.payment[key])}</p>)}
+            {selectedJob.payment.refunds?.map((refund) => <p key={refund._id}>Refund {money(refund.total)} · {refund.status} · {formatDate(refund.createdAt)}</p>)}
+          </div> : <p>No payment recorded.</p>}
+          {selectedJob.cancellation && <div className="admin-info-box">
+            <p className="admin-info-label">Cancellation</p>
+            <p>{selectedJob.cancellation.role || 'Unknown role'} · {formatDate(selectedJob.cancellation.cancelledAt)}</p>
+            <p>{selectedJob.cancellation.reason}</p><p className="whitespace-pre-wrap">{selectedJob.cancellation.description}</p>
+            <p>Settlement: {selectedJob.cancellation.status || '—'} · Refund: {selectedJob.cancellation.refundStatus || '—'}</p>
+            <p>Client refund: {money(selectedJob.cancellation.refundAmount)} · Worker amount: {money(selectedJob.cancellation.workerAmount)}</p>
+            <p>Cancelled from: {selectedJob.cancellation.fromStatus || '—'} · Had payment: {selectedJob.cancellation.hadPayment == null ? '—' : selectedJob.cancellation.hadPayment ? 'Yes' : 'No'}</p>
+            <p>Client refund percentage: {selectedJob.cancellation.clientRefundPercent == null ? '—' : `${selectedJob.cancellation.clientRefundPercent}%`}</p>
+            <p>Retained platform fee: {money(selectedJob.cancellation.retainedPlatformFee)} · Priority fee: {money(selectedJob.cancellation.retainedPriorityFee)} · Tax: {money(selectedJob.cancellation.retainedTax)}</p>
+            <p>Settled: {formatDate(selectedJob.cancellation.settledAt)}</p>
+          </div>}
+          {selectedJob.dispute && <div className="admin-info-box"><p className="admin-info-label">Dispute</p><StatusPill status={selectedJob.dispute.status} /><p>{selectedJob.dispute.reason}</p><p>Created {formatDate(selectedJob.dispute.createdAt)}</p></div>}
+          <div className="admin-info-box"><p className="admin-info-label">Applicants ({selectedJob.applicants?.total ?? 0})</p>
+            {selectedJob.applicants?.items?.map((applicant) => <div key={applicant._id} className="border-b border-line py-2"><p>{applicant.worker?.fullName || 'Unavailable account'} · {applicant.worker?.email}</p><StatusPill status={applicant.status} /><p>{applicant.proposedAmount != null ? money(applicant.proposedAmount) : 'No proposed amount'} · {formatDate(applicant.createdAt)}</p><p className="whitespace-pre-wrap">{applicant.note}</p></div>)}
+          </div>
+          <div className="admin-info-box"><p className="admin-info-label">Status history</p>
+            {!selectedJob.statusHistory?.length && <p>No status history recorded.</p>}
+            {selectedJob.statusHistory?.map((entry) => <div key={entry._id} className="border-b border-line py-2"><p>{entry.fromStatus || 'Created'} → {entry.toStatus}</p><p>{entry.changedBy?.fullName || 'System'} · {formatDate(entry.createdAt)}</p><p className="whitespace-pre-wrap">{entry.note}</p></div>)}
+          </div>
+          </>}
+
         </AdminModal>
       )}
     </div>

@@ -17,10 +17,12 @@ const NAV = [
   { page: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { page: 'verifications', label: 'Verification Queue', icon: ShieldCheck },
   { page: 'users', label: 'Users', icon: Users },
-  { page: 'jobs', label: 'Jobs & Orders', icon: Briefcase },
+  { page: 'jobs', label: 'Jobs', icon: Briefcase },
   { page: 'openRequests', label: 'Open Requests', icon: Inbox },
   { page: 'payouts', label: 'Payouts', icon: Banknote },
   { page: 'disputes', label: 'Disputes', icon: AlertTriangle },
+  { page: 'supportTickets', label: 'Support Tickets', icon: Inbox },
+  { page: 'userReports', label: 'User Reports', icon: ShieldCheck },
   { page: 'categories', label: 'Categories', icon: Tag },
   { page: 'settings', label: 'Fees & Platform', icon: SlidersHorizontal },
 ]

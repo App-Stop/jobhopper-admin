@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Eye, Check, X, ShieldCheck, FileWarning } from 'lucide-react'
 import { AdminHeader, AdminModal, AdminTable, AdminToolbar, FileImage, NameCell, RefreshButton, StatusPill } from './AdminParts'
 import { apiRequest, apiRequestAll } from '../api/client'
@@ -25,19 +25,27 @@ const Verifications = () => {
   const [rejecting, setRejecting] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [reviewError, setReviewError] = useState('')
+  const [listLoading, setListLoading] = useState(false)
+  const request = useRef(0)
+  const reviewBusy = useRef(false)
+  useEffect(() => () => { request.current++ }, [])
 
   const loadData = async (status = FILTER_STATUSES[filter]) => {
+    const id = ++request.current
+    setListLoading(true)
     try {
       const [queue, workers] = await Promise.all([
         apiRequestAll('/admin/workers/verification-queue', 'profiles', status ? { status } : {}),
         apiRequestAll('/admin/users', 'users', { role: 'worker' }),
       ])
+      if (id !== request.current) return
       const usersById = new Map(workers.map((u) => [u._id, u]))
       setProfiles(queue.map((p) => ({ ...p, account: usersById.get(p.user) || null })))
       setError(null)
     } catch (err) {
-      setError(err.message)
-    }
+      if (id === request.current) setError(err.message)
+    } finally { if (id === request.current) setListLoading(false) }
   }
 
   useEffect(() => {
@@ -46,6 +54,8 @@ const Verifications = () => {
   }, [filter])
 
   const closeInspect = () => {
+    if (reviewBusy.current) return
+    setReviewError('')
     setInspectProfile(null)
     setRejecting(false)
     setRejectionReason('')
@@ -53,17 +63,22 @@ const Verifications = () => {
 
   // `workerUserId` is the worker's User id (profile.user), which is what the route expects.
   const review = async (workerUserId, body) => {
+    if (reviewBusy.current) return
+    reviewBusy.current = true
+    setReviewError('')
     setLoading(true)
     try {
       await apiRequest(`/admin/workers/${workerUserId}/verification`, {
         method: 'PATCH',
         body: JSON.stringify(body),
       })
+      reviewBusy.current = false
       closeInspect()
       loadData()
     } catch (err) {
-      alert(err.message || 'Review failed')
+      setReviewError(err.message || 'Review failed')
     } finally {
+      reviewBusy.current = false
       setLoading(false)
     }
   }
@@ -81,7 +96,7 @@ const Verifications = () => {
 
   const handleReject = (p) => {
     if (!rejectionReason.trim()) {
-      alert('Please enter a rejection reason')
+      setReviewError('Please enter a rejection reason')
       return
     }
     review(p.user, { status: 'rejected', rejectionReason: rejectionReason.trim() })
@@ -189,6 +204,9 @@ const Verifications = () => {
         filterLabel="Filter by verification status"
       />
 
+      {listLoading && <p role="status">Loading verification queue…</p>}
+      {error && <p role="alert" className="text-rose-600">Couldn’t load verification queue: {error}</p>}
+      {reviewError && !inspectProfile && <p role="alert" className="text-rose-600">{reviewError}</p>}
       <AdminTable
         columns={columns}
         rows={rows}
@@ -238,6 +256,7 @@ const Verifications = () => {
             )
           }
         >
+          {reviewError && <p role="alert" className="text-rose-600">{reviewError}</p>}
           <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted">
             <StatusPill status={inspectProfile.verificationStatus} />
             {inspectProfile.verification?.method && (
