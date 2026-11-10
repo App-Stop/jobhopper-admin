@@ -25,7 +25,7 @@ const JOB_COLUMNS = [
   {
     key: 'client',
     label: 'Client',
-    render: (j) => <span className="admin-cell-strong">{j.client?.fullName || '—'}</span>,
+    render: (j) => <span className="admin-cell-strong" title={j.client?.fullName}>{j.client?.fullName || '—'}</span>,
   },
   {
     key: 'amount',
@@ -270,6 +270,7 @@ const Dashboard = () => {
 
       <div className="admin-grid">
         <AdminTable
+          compact
           title="Recent Marketplace Jobs"
           columns={JOB_COLUMNS}
           rows={recentJobs}
@@ -286,6 +287,7 @@ const Dashboard = () => {
         />
 
         <AdminTable
+          compact
           title={pendingVerifications !== null ? `Verification Queue (${formatNumber(pendingVerifications)})` : 'Verification Queue'}
           columns={WORKER_COLUMNS}
           rows={pendingWorkers}

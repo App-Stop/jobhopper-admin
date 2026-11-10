@@ -160,7 +160,7 @@ export const StatusPill = ({ status, overrides }) => {
   }
 
   return (
-    <span className={`admin-status admin-status--${conf.modifier}`}>
+    <span className={`admin-status admin-status--${conf.modifier}`} title={conf.label}>
       {conf.label}
     </span>
   )
@@ -208,7 +208,7 @@ const useStackedLayout = (rows, columnCount) => {
 }
 
 // `columns`: [{ key, label, render?, align? }] — `render` receives the row.
-export const AdminTable = ({ title, action, columns, rows = [], empty = 'Nothing to show yet.' }) => {
+export const AdminTable = ({ title, action, columns, rows = [], empty = 'Nothing to show yet.', compact = false }) => {
   const [wrapRef, stacked] = useStackedLayout(rows, columns.length)
   const alignClass = (col) => (col.align === 'right' ? 'text-right' : 'text-left')
 
@@ -221,7 +221,7 @@ export const AdminTable = ({ title, action, columns, rows = [], empty = 'Nothing
         </div>
       )}
       <div className="admin-table-wrap" ref={wrapRef}>
-        <table className={`admin-table ${stacked ? 'admin-table--stacked' : ''}`}>
+        <table className={`admin-table ${compact ? 'admin-table--compact' : ''} ${stacked ? 'admin-table--stacked' : ''}`}>
           <thead>
             <tr>
               {columns.map((col) => (
@@ -267,8 +267,8 @@ export const NameCell = ({ name = 'User', sub, avatarChar }) => (
       {avatarChar || (name ? name[0] : 'U')}
     </span>
     <div className="min-w-0 max-w-[200px]">
-      <p className="admin-cell-strong truncate">{name}</p>
-      {sub && <p className="admin-cell-sub truncate">{sub}</p>}
+      <p className="admin-cell-strong truncate" title={name}>{name}</p>
+      {sub && <p className="admin-cell-sub truncate" title={sub}>{sub}</p>}
     </div>
   </div>
 )

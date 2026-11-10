@@ -341,6 +341,47 @@
   @apply py-12 text-center text-muted;
 }
 
+/* Dashboard summaries keep four columns in narrow laptop cards. Below this
+   minimum, the existing overflow observer switches to the mobile layout. */
+.admin-table--compact:not(.admin-table--stacked) {
+  @apply table-fixed text-[12px];
+  min-width: 440px;
+}
+
+.admin-table--compact:not(.admin-table--stacked) th,
+.admin-table--compact:not(.admin-table--stacked) td {
+  @apply px-2;
+}
+
+.admin-table--compact:not(.admin-table--stacked) td {
+  @apply py-2.5 overflow-hidden whitespace-nowrap text-ellipsis;
+}
+
+.admin-table--compact:not(.admin-table--stacked) th:first-child { width: 34%; }
+.admin-table--compact:not(.admin-table--stacked) th:nth-child(2) { width: 24%; }
+.admin-table--compact:not(.admin-table--stacked) th:nth-child(3) { width: 18%; }
+.admin-table--compact:not(.admin-table--stacked) th:last-child { width: 24%; }
+
+.admin-table--compact:not(.admin-table--stacked) .admin-name-cell {
+  @apply gap-2 min-w-0;
+}
+
+.admin-table--compact:not(.admin-table--stacked) .admin-avatar {
+  @apply size-7 text-[11px];
+}
+
+.admin-table--compact:not(.admin-table--stacked) .admin-cell-sub {
+  @apply text-[11px];
+}
+
+.admin-table--compact:not(.admin-table--stacked) .admin-status {
+  @apply max-w-full inline-block overflow-hidden text-ellipsis align-middle px-2 text-[11px];
+}
+
+.admin-table--compact:not(.admin-table--stacked) .admin-status::before {
+  @apply inline-block mr-1 align-middle;
+}
+
 /* Stacked layout: each row becomes a block of label/value pairs. */
 .admin-table--stacked,
 .admin-table--stacked tbody {
