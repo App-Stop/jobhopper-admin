@@ -484,11 +484,11 @@
 /* ---------- Admin: toolbar ---------- */
 
 .admin-toolbar {
-  @apply flex flex-col lg:flex-row lg:items-center justify-between gap-3;
+  @apply flex flex-col lg:flex-row flex-wrap lg:items-center justify-between gap-3 min-w-0;
 }
 
 .admin-search {
-  @apply flex items-center gap-2 w-full lg:max-w-[360px] h-10 short:h-9 px-3.5 bg-white rounded-[10px] cursor-text
+  @apply flex items-center gap-2 w-full min-w-0 lg:flex-[1_0_280px] lg:max-w-[360px] h-10 short:h-9 px-3.5 bg-white rounded-[10px] cursor-text
          transition-shadow focus-within:ring-2 focus-within:ring-primary/15;
 }
 
@@ -502,7 +502,7 @@
 
 /* Segmented control */
 .admin-filters {
-  @apply inline-flex max-w-full items-center gap-1 p-1 bg-white rounded-[10px] overflow-x-auto;
+  @apply inline-flex flex-wrap min-w-0 max-w-full items-center gap-1 p-1 bg-white rounded-[10px];
 }
 
 .admin-filter {
@@ -679,6 +679,27 @@ select.admin-filter[multiple] {
 
 .admin-split-dot {
   @apply size-2 shrink-0 rounded-full;
+}
+
+.admin-multiple-filter {
+  @apply relative flex flex-col gap-1 text-[13px] text-muted;
+}
+
+.admin-multiple-trigger {
+  @apply flex items-center justify-between gap-3 h-8 min-w-[170px] px-3 rounded-[10px] bg-white text-primary cursor-pointer
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30;
+}
+
+.admin-multiple-options {
+  @apply absolute top-full left-0 z-20 mt-1 w-64 max-w-[calc(100vw-3rem)] max-h-64 overflow-y-auto rounded-[10px] border border-line bg-white p-1 shadow-lg;
+}
+
+.admin-multiple-option {
+  @apply flex items-center gap-2 px-3 py-2 rounded-md text-dark-900 cursor-pointer hover:bg-fill focus-within:bg-fill;
+}
+
+.admin-multiple-option input {
+  @apply size-4 shrink-0 accent-primary;
 }
 
 .admin-date-input {

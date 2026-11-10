@@ -192,7 +192,7 @@ const Payouts = () => {
         renderFilter={(f) => `${filterLabel(f)} (${f === 'All' ? allCount : counts[f] ?? 0})`}
       />
 
-      <ListFilters fields={[{ key: 'status', label: 'Exact statuses (multiple)', multiple: true, options: Object.keys(PAYOUT_STATUS) }]} onApply={(values) => { setStatuses(values.status || []); setFilter('All'); setPage(1) }} />
+      <ListFilters fields={[{ key: 'status', label: 'Exact statuses (multiple)', multiple: true, options: Object.entries(PAYOUT_STATUS).map(([value, config]) => ({ value, label: config.label })) }]} onApply={(values) => { setStatuses(values.status || []); setFilter('All'); setPage(1) }} />
       <div className="flex flex-wrap items-center gap-3 text-[13px] text-muted">
         <label className="flex items-center gap-2">
           From
