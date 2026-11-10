@@ -323,7 +323,7 @@ const Disputes = () => {
                   </p>
                 </div>
               ) : (
-                <p className="rounded-[14px] border border-amber-200 bg-amber-50 p-3.5 text-[13px] text-amber-800">
+                <p className="rounded-[12px] bg-amber-50 p-3.5 text-[13px] text-amber-800">
                   No payment was found for this job, so it can&apos;t be resolved.
                 </p>
               )}
@@ -367,7 +367,7 @@ const Disputes = () => {
               )}
 
               {!resolved && !jobDisputed && (
-                <p className="rounded-[14px] border border-amber-200 bg-amber-50 p-3.5 text-[13px] text-amber-800">
+                <p className="rounded-[12px] bg-amber-50 p-3.5 text-[13px] text-amber-800">
                   This job is no longer in the disputed state, so evidence can&apos;t be requested and the dispute can&apos;t
                   be resolved.
                 </p>

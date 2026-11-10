@@ -194,7 +194,7 @@ const Dashboard = () => {
       />
 
       {overviewError && (
-        <p className="rounded-[14px] border border-rose-200 bg-rose-50 px-4 py-3 text-[13.5px] text-rose-700" role="alert">
+        <p className="rounded-[12px] bg-rose-50 px-4 py-3 text-[13.5px] text-rose-700" role="alert">
           Couldn&apos;t load the overview: {overviewError}
         </p>
       )}

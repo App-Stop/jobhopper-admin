@@ -290,7 +290,7 @@ const Verifications = () => {
               ))}
             </div>
           ) : (
-            <div className="flex items-start gap-2.5 rounded-[14px] border border-amber-200 bg-amber-50 p-3.5 text-[13px] text-amber-800">
+            <div className="flex items-start gap-2.5 rounded-[12px] bg-amber-50 p-3.5 text-[13px] text-amber-800">
               <FileWarning className="size-4 shrink-0 mt-0.5" />
               <p>This worker hasn&apos;t submitted any ID photos.</p>
             </div>

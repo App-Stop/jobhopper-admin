@@ -16,13 +16,20 @@
   --color-dark-900: #111111;
   --color-muted: #64748b;
   --color-muted-light: #94a3b8;
-  --color-line: #e2e8f0;
-  --color-line-strong: #cbd5e1;
-  --color-surface: #f8fafc;
+  --color-line: #eceef1;
+  --color-line-strong: #dadee4;
+  /* Page background; cards sit on it as flat white panels. */
+  --color-surface: #f0f1f3;
+  /* Filled controls (inputs, secondary buttons) inside white cards. */
+  --color-fill: #f4f5f7;
+  --color-fill-strong: #e9ebee;
   --color-subtle: #94a3b8;
   --color-placeholder: #94a3b8;
   --font-primary: 'Inter', sans-serif;
 }
+
+/* Desktop screens with little height (e.g. 1280x720, 1440x860): tighter vertical spacing. */
+@custom-variant short (@media (min-width: 1024px) and (max-height: 860px));
 
 @layer base {
   body {
@@ -41,7 +48,7 @@
 /* ---------- Buttons ---------- */
 
 .btn {
-  @apply inline-flex items-center justify-center gap-2 h-10 px-4 shrink-0 rounded-full border border-transparent
+  @apply inline-flex items-center justify-center gap-2 h-10 short:h-9 px-4 shrink-0 rounded-[10px] border-0
          text-[14px] leading-none font-semibold whitespace-nowrap no-underline cursor-pointer select-none
          transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30
          disabled:opacity-50 disabled:cursor-not-allowed;
@@ -52,7 +59,7 @@
 }
 
 .btn-sm {
-  @apply h-8 px-3 gap-1.5 text-[12.5px];
+  @apply h-8 px-3 gap-1.5 rounded-[8px] text-[12.5px];
 }
 
 .btn-sm svg {
@@ -71,20 +78,26 @@
   @apply bg-primary text-white enabled:hover:bg-primary-dark;
 }
 
+/* Secondary button: white on the gray page, gray fill inside white cards and dialogs. */
 .btn-outline {
-  @apply bg-white border-line text-dark-900 enabled:hover:bg-surface enabled:hover:border-line-strong;
+  @apply bg-white text-dark-900 enabled:hover:bg-fill-strong;
+}
+
+.admin-card .btn-outline,
+.admin-modal .btn-outline {
+  @apply bg-fill enabled:hover:bg-fill-strong;
 }
 
 .btn-ghost {
-  @apply bg-transparent text-muted enabled:hover:bg-primary-light enabled:hover:text-primary;
+  @apply bg-transparent text-muted enabled:hover:bg-fill-strong enabled:hover:text-dark-900;
 }
 
 .btn-success {
-  @apply bg-white border-emerald-200 text-emerald-700 enabled:hover:bg-emerald-50;
+  @apply bg-emerald-50 text-emerald-700 enabled:hover:bg-emerald-100;
 }
 
 .btn-danger {
-  @apply bg-white border-rose-200 text-rose-600 enabled:hover:bg-rose-50;
+  @apply bg-rose-50 text-rose-600 enabled:hover:bg-rose-100;
 }
 
 .btn-danger-solid {
@@ -114,9 +127,9 @@
 }
 
 .modal-field {
-  @apply relative flex flex-col gap-[8px] pt-[10px] pb-[12px] px-[16px] bg-white rounded-[18px]
-         border border-line cursor-text transition-colors
-         focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary;
+  @apply relative flex flex-col gap-[6px] pt-[10px] pb-[12px] px-[14px] bg-fill rounded-[12px]
+         cursor-text transition-colors
+         focus-within:bg-fill-strong focus-within:ring-2 focus-within:ring-primary/15;
 }
 
 .modal-field-label {
@@ -129,7 +142,7 @@
 }
 
 .modal-btn {
-  @apply flex items-center justify-center w-full h-[50px] shrink-0 px-5 rounded-full border-0
+  @apply flex items-center justify-center w-full h-12 shrink-0 px-5 rounded-[12px] border-0
          text-[15px] leading-normal font-semibold cursor-pointer transition-colors
          disabled:opacity-50 disabled:cursor-not-allowed;
 }
@@ -143,7 +156,7 @@
 }
 
 .modal-btn-outline {
-  @apply bg-white border border-line text-dark-900 enabled:hover:bg-primary-light;
+  @apply bg-fill text-dark-900 enabled:hover:bg-fill-strong;
 }
 
 .modal-field-textarea {

@@ -339,7 +339,7 @@ const Settings = () => {
       <div className="admin-settings">
         <form id="fee-settings" onSubmit={handleSave} className="admin-settings-groups">
           {loadError && (
-            <p className="rounded-[14px] border border-rose-200 bg-rose-50 px-4 py-3 text-[13.5px] text-rose-700" role="alert">
+            <p className="rounded-[12px] bg-rose-50 px-4 py-3 text-[13.5px] text-rose-700" role="alert">
               Couldn't load the current fee settings: {loadError} Editing is disabled until settings load. <button type="button" className="btn btn-sm btn-outline" onClick={() => setLoadAttempt((value) => value + 1)}>Retry</button>
             </p>
           )}

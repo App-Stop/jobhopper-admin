@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ImageOff, RefreshCw, Search, TrendingDown, TrendingUp, X } from 'lucide-react'
 import { apiFileObjectUrl } from '../api/client'
 
@@ -166,57 +166,100 @@ export const StatusPill = ({ status, overrides }) => {
   )
 }
 
+const ACTION_KEYS = new Set(['action', 'actions'])
+
+/**
+ * Lists never scroll sideways: while laid out as a table, the wrapper checks whether the table
+ * overflows it, and if so switches to the stacked (label/value) layout. It switches back once the
+ * wrapper is wider than the table needed. Runs in layout effects, so the user never sees the overflow.
+ */
+const useStackedLayout = (rows, columnCount) => {
+  const wrapRef = useRef(null)
+  const neededWidth = useRef(0)
+  const [stacked, setStacked] = useState(false)
+
+  // New rows can change how wide the table needs to be, so measure it as a table again.
+  useLayoutEffect(() => {
+    neededWidth.current = 0
+    setStacked(false)
+  }, [rows, columnCount])
+
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current
+    if (!wrap) return undefined
+    const check = () => {
+      const available = wrap.clientWidth
+      if (stacked) {
+        if (available >= neededWidth.current) setStacked(false)
+        return
+      }
+      if (wrap.scrollWidth > available + 1) {
+        neededWidth.current = wrap.scrollWidth + 24
+        setStacked(true)
+      }
+    }
+    check()
+    const observer = new ResizeObserver(check)
+    observer.observe(wrap)
+    return () => observer.disconnect()
+  }, [stacked, rows, columnCount])
+
+  return [wrapRef, stacked]
+}
+
 // `columns`: [{ key, label, render?, align? }] — `render` receives the row.
-export const AdminTable = ({ title, action, columns, rows = [], empty = 'Nothing to show yet.' }) => (
-  <section className="admin-card">
-    {(title || action) && (
-      <div className="admin-card-head">
-        {title && <h2 className="admin-card-title">{title}</h2>}
-        {action}
-      </div>
-    )}
-    <div className="admin-table-wrap">
-      <table className="admin-table">
-        <thead>
-          <tr>
-            {columns.map((col) => (
-              <th
-                key={col.key}
-                style={{ textAlign: col.align === 'right' ? 'right' : 'left' }}
-                className={col.align === 'right' ? 'text-right' : 'text-left'}
-              >
-                {col.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
+export const AdminTable = ({ title, action, columns, rows = [], empty = 'Nothing to show yet.' }) => {
+  const [wrapRef, stacked] = useStackedLayout(rows, columns.length)
+  const alignClass = (col) => (col.align === 'right' ? 'text-right' : 'text-left')
+
+  return (
+    <section className="admin-card">
+      {(title || action) && (
+        <div className="admin-card-head">
+          {title && <h2 className="admin-card-title">{title}</h2>}
+          {action}
+        </div>
+      )}
+      <div className="admin-table-wrap" ref={wrapRef}>
+        <table className={`admin-table ${stacked ? 'admin-table--stacked' : ''}`}>
+          <thead>
             <tr>
-              <td colSpan={columns.length} className="admin-table-empty">
-                {empty}
-              </td>
+              {columns.map((col) => (
+                <th key={col.key} className={alignClass(col)}>
+                  {col.label}
+                </th>
+              ))}
             </tr>
-          ) : (
-            rows.map((row, idx) => (
-              <tr key={row._id || row.id || idx}>
-                {columns.map((col) => (
-                  <td
-                    key={col.key}
-                    style={{ textAlign: col.align === 'right' ? 'right' : 'left' }}
-                    className={col.align === 'right' ? 'text-right' : 'text-left'}
-                  >
-                    {col.render ? col.render(row) : row[col.key]}
-                  </td>
-                ))}
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length} className="admin-table-empty">
+                  {empty}
+                </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  </section>
-)
+            ) : (
+              rows.map((row, idx) => (
+                <tr key={row._id || row.id || idx}>
+                  {columns.map((col) => (
+                    <td
+                      key={col.key}
+                      className={alignClass(col)}
+                      data-label={col.label}
+                      data-actions={ACTION_KEYS.has(col.key) || undefined}
+                    >
+                      {col.render ? col.render(row) : row[col.key]}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
 
 export const NameCell = ({ name = 'User', sub, avatarChar }) => (
   <div className="admin-name-cell">
@@ -257,7 +300,7 @@ export const FileImage = ({ file, alt, className = '' }) => {
     }
   }, [file?._id, publicUrl])
 
-  const box = `flex items-center justify-center overflow-hidden rounded-xl border border-line bg-surface ${className}`
+  const box = `flex items-center justify-center overflow-hidden rounded-[10px] bg-fill ${className}`
   if (!file) {
     return (
       <div className={`${box} text-[12px] text-muted`}>

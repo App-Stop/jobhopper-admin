@@ -1,11 +1,14 @@
 @reference '../index.css';
 
-/* See index.css: keep these in the components layer so markup utilities can override them. */
+/*
+ * Flat style: white panels on a light gray page, filled controls, no borders or shadows.
+ * Remaining dividers use the very light `line` color. `short:` tightens spacing on short desktop screens.
+ * See index.css: keep these in the components layer so markup utilities can override them.
+ */
 @layer components {
 
 /* ---------- Admin: login ---------- */
 
-/* Flat style: filled fields and buttons, no borders or shadows. */
 .admin-login {
   @apply flex flex-col min-h-screen px-4 sm:px-6 bg-white text-dark-900;
 }
@@ -39,9 +42,9 @@
 }
 
 .admin-login-input {
-  @apply w-full h-12 px-4 rounded-[12px] border-0 bg-[#f2f3f5] text-[15px] text-dark-900 outline-none
-         transition-colors placeholder:text-placeholder hover:bg-[#eceef1]
-         focus:bg-[#eceef1] focus:ring-2 focus:ring-primary/20;
+  @apply w-full h-12 px-4 rounded-[12px] border-0 bg-fill text-[15px] text-dark-900 outline-none
+         transition-colors placeholder:text-placeholder hover:bg-fill-strong
+         focus:bg-fill-strong focus:ring-2 focus:ring-primary/20;
 }
 
 .admin-login-note {
@@ -91,52 +94,46 @@
   @apply flex flex-col lg:flex-row min-h-screen bg-surface text-dark-900;
 }
 
+/* Top bar on small screens; a white panel floating on the gray page from `lg`. */
 .admin-sidebar {
-  @apply flex lg:flex-col items-center lg:items-stretch gap-3 lg:gap-8 px-4 py-3 lg:p-6
-         lg:w-[260px] lg:shrink-0 lg:h-screen lg:sticky lg:top-0 bg-primary text-white;
+  @apply sticky top-0 z-30 flex lg:flex-col items-center lg:items-stretch gap-3 lg:gap-6 short:lg:gap-4
+         px-4 py-3 lg:p-4 short:lg:p-3 bg-white
+         lg:w-[236px] lg:shrink-0 lg:h-[calc(100vh-24px)] lg:m-3 lg:top-3 lg:rounded-[16px];
 }
 
 .admin-brand {
-  @apply flex items-center gap-2.5 shrink-0 no-underline;
+  @apply flex items-center gap-2.5 shrink-0 lg:px-2 lg:pt-1 no-underline;
 }
 
 .admin-logo--sidebar {
-  @apply h-8 lg:h-9 object-contain brightness-0 invert;
+  @apply h-7 lg:h-8 short:lg:h-7;
 }
 
 .admin-nav {
-  @apply flex lg:flex-col gap-1 lg:flex-1 min-w-0 lg:min-h-0 overflow-x-auto lg:overflow-x-hidden lg:overflow-y-auto;
+  @apply flex lg:flex-col gap-1 short:lg:gap-0.5 lg:flex-1 min-w-0 lg:min-h-0
+         overflow-x-auto lg:overflow-x-hidden lg:overflow-y-auto;
 }
 
 .admin-nav-link {
-  @apply flex items-center gap-3 px-3 lg:px-4 py-2 lg:py-2.5 rounded-full no-underline
-         text-[13px] lg:text-[15px] leading-normal font-medium text-white/75
-         hover:bg-white/10 hover:text-white transition-colors whitespace-nowrap;
+  @apply flex items-center gap-3 px-3 py-2 lg:py-2.5 short:lg:py-[7px] rounded-[10px] no-underline
+         text-[13px] lg:text-[14px] leading-normal font-medium text-muted
+         hover:bg-fill hover:text-dark-900 transition-colors whitespace-nowrap;
 }
 
 .admin-nav-link svg {
-  @apply size-4.5 shrink-0;
+  @apply size-[18px] shrink-0;
 }
 
-/* Active item mirrors cozy-admin's solid white button */
 .admin-nav-link[aria-current='page'] {
-  @apply bg-white font-semibold text-primary hover:bg-white hover:text-primary;
+  @apply bg-primary text-white hover:bg-primary hover:text-white;
 }
 
 .admin-account {
-  @apply flex items-center gap-3 ml-auto lg:ml-0 lg:pt-4 lg:border-t border-white/20;
+  @apply flex items-center gap-3 ml-auto lg:ml-0 lg:p-2.5 short:lg:p-2 lg:rounded-[12px] lg:bg-fill;
 }
 
-.admin-sidebar .admin-avatar {
-  @apply bg-white/15 text-white;
-}
-
-.admin-sidebar .admin-account-email {
-  @apply text-white/70;
-}
-
-.admin-sidebar .admin-icon-btn {
-  @apply bg-transparent border-white/40 text-white hover:bg-white/10 hover:text-white;
+.admin-account .admin-icon-btn {
+  @apply lg:bg-white;
 }
 
 .admin-account-text {
@@ -144,7 +141,7 @@
 }
 
 .admin-account-name {
-  @apply text-[14px] leading-normal font-semibold capitalize truncate;
+  @apply text-[13.5px] leading-normal font-semibold capitalize truncate text-dark-900;
 }
 
 .admin-account-email {
@@ -152,17 +149,17 @@
 }
 
 .admin-avatar {
-  @apply hidden lg:flex items-center justify-center size-10 shrink-0 rounded-full bg-primary-light
-         text-[15px] font-semibold text-primary uppercase;
+  @apply hidden lg:flex items-center justify-center size-9 shrink-0 rounded-full bg-primary-light
+         text-[14px] font-semibold text-primary uppercase;
 }
 
 .admin-avatar--sm {
-  @apply flex size-9 text-[13px];
+  @apply flex size-8 text-[12.5px];
 }
 
 .admin-icon-btn {
-  @apply flex items-center justify-center size-9 shrink-0 rounded-full bg-white border border-line
-         text-muted cursor-pointer hover:bg-primary-light hover:text-primary transition-colors;
+  @apply flex items-center justify-center size-9 short:size-8 shrink-0 rounded-full border-0 bg-fill
+         text-muted cursor-pointer hover:bg-fill-strong hover:text-dark-900 transition-colors;
 }
 
 .admin-icon-btn svg {
@@ -170,35 +167,35 @@
 }
 
 .admin-main {
-  @apply flex-1 min-w-0 px-4 sm:px-6 lg:px-10 py-6 lg:py-10;
+  @apply flex-1 min-w-0 px-4 sm:px-6 lg:pl-3 lg:pr-6 py-5 lg:py-6 short:lg:py-4;
 }
 
 .admin-page {
-  @apply flex flex-col gap-6 max-w-[1400px] mx-auto;
+  @apply flex flex-col gap-5 short:gap-4 max-w-[1440px] mx-auto;
 }
 
 /* ---------- Admin: page header ---------- */
 
 .admin-header {
-  @apply flex flex-col md:flex-row md:items-end md:justify-between gap-4 pb-6 border-b border-line;
+  @apply flex flex-col md:flex-row md:items-end md:justify-between gap-4 short:gap-3;
 }
 
 .admin-header-text {
-  @apply flex flex-col gap-1.5 min-w-0;
+  @apply flex flex-col gap-1 min-w-0;
 }
 
 .admin-title {
-  @apply flex flex-wrap items-center gap-x-3 gap-y-1 text-[24px] sm:text-[28px] leading-tight font-semibold
-         tracking-tight text-dark-900;
+  @apply flex flex-wrap items-center gap-x-3 gap-y-1 text-[24px] sm:text-[28px] short:sm:text-[24px]
+         leading-tight font-semibold tracking-[-0.02em] text-dark-900;
 }
 
 .admin-title-count {
-  @apply inline-flex items-center h-7 px-2.5 rounded-full bg-white border border-line
+  @apply inline-flex items-center h-7 px-2.5 rounded-full bg-white
          text-[13px] font-semibold tracking-normal tabular-nums text-muted;
 }
 
 .admin-subtitle {
-  @apply max-w-[640px] text-[14.5px] leading-relaxed text-muted;
+  @apply max-w-[640px] text-[14px] short:text-[13.5px] leading-relaxed text-muted;
 }
 
 .admin-header-actions {
@@ -208,11 +205,11 @@
 /* ---------- Admin: stat cards ---------- */
 
 .admin-stats {
-  @apply grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4;
+  @apply grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 short:gap-3;
 }
 
 .admin-stat {
-  @apply flex flex-col gap-2 p-5 bg-white rounded-[20px] border border-line transition-colors;
+  @apply flex flex-col gap-2 short:gap-1.5 p-5 short:p-4 bg-white rounded-[14px] transition-colors;
 }
 
 .admin-stat-top {
@@ -220,19 +217,19 @@
 }
 
 .admin-stat-label {
-  @apply text-[14px] leading-normal font-medium text-muted;
+  @apply text-[13.5px] leading-normal font-medium text-muted;
 }
 
 .admin-stat-icon {
-  @apply flex items-center justify-center size-10 shrink-0 rounded-full bg-primary-light text-primary;
+  @apply flex items-center justify-center size-9 shrink-0 rounded-full bg-fill text-primary;
 }
 
 .admin-stat-icon svg {
-  @apply size-5;
+  @apply size-[18px];
 }
 
 .admin-stat-value {
-  @apply text-[28px] leading-tight font-bold tabular-nums text-dark-900;
+  @apply text-[28px] short:text-[24px] leading-tight font-semibold tracking-[-0.02em] tabular-nums text-dark-900;
 }
 
 .admin-trend {
@@ -257,7 +254,7 @@
 
 /* Lead card painted primary (JobHopper Navy) */
 .admin-stat--primary {
-  @apply bg-primary text-white border-primary;
+  @apply bg-primary text-white;
 }
 
 .admin-stat--primary .admin-stat-value {
@@ -267,25 +264,25 @@
 .admin-stat--primary .admin-stat-label,
 .admin-stat--primary .admin-trend,
 .admin-stat--primary .admin-trend span {
-  @apply text-white/85;
+  @apply text-white/80;
 }
 
 .admin-stat--primary .admin-stat-icon {
-  @apply bg-white/20 text-white;
+  @apply bg-white/15 text-white;
 }
 
 /* ---------- Admin: cards & tables ---------- */
 
 .admin-grid {
-  @apply grid grid-cols-1 xl:grid-cols-2 gap-6 items-start;
+  @apply grid grid-cols-1 xl:grid-cols-2 gap-4 items-start;
 }
 
 .admin-card {
-  @apply flex flex-col min-w-0 bg-white rounded-[20px] border border-line overflow-hidden;
+  @apply flex flex-col min-w-0 bg-white rounded-[14px] overflow-hidden;
 }
 
 .admin-card-head {
-  @apply flex items-center justify-between gap-4 min-h-[60px] px-5 py-3 border-b border-line;
+  @apply flex items-center justify-between gap-4 min-h-[56px] short:min-h-[48px] px-5 pt-3 pb-1;
 }
 
 .admin-card-title {
@@ -297,27 +294,38 @@
 }
 
 .admin-link {
-  @apply flex items-center gap-1 text-[14px] font-medium text-primary no-underline hover:underline cursor-pointer whitespace-nowrap;
+  @apply flex items-center gap-1 text-[13.5px] font-medium text-primary no-underline hover:underline cursor-pointer whitespace-nowrap;
 }
 
 .admin-link svg {
   @apply size-4;
 }
 
+/* The table sits inset in its card, with a filled header row (no outer rules). */
 .admin-table-wrap {
-  @apply overflow-x-auto;
+  @apply p-2 overflow-x-auto;
 }
 
+.admin-card-head + .admin-table-wrap {
+  @apply pt-1;
+}
+
+/* Cells wrap so wide lists fit the screen; AdminTable stacks rows when even that isn't enough. */
 .admin-table {
-  @apply w-full border-collapse text-[14px] leading-normal;
+  @apply w-full border-separate border-spacing-0 text-[13.5px] leading-snug;
 }
 
 .admin-table th {
-  @apply h-11 px-5 bg-surface text-left text-[11.5px] font-semibold uppercase tracking-wider text-muted whitespace-nowrap;
+  @apply h-10 short:h-9 px-3 bg-fill text-left text-[12px] font-medium text-muted whitespace-nowrap
+         first:rounded-l-[10px] last:rounded-r-[10px];
 }
 
 .admin-table td {
-  @apply px-5 py-3.5 border-t border-line whitespace-nowrap tabular-nums align-middle;
+  @apply px-3 py-3 short:py-2.5 border-t border-line tabular-nums align-middle;
+}
+
+.admin-table tbody tr:first-child td {
+  @apply border-t-0;
 }
 
 .admin-table th.text-right,
@@ -326,11 +334,60 @@
 }
 
 .admin-table tbody tr {
-  @apply hover:bg-primary-light/40 transition-colors;
+  @apply hover:bg-fill/60 transition-colors;
 }
 
 .admin-table-empty {
   @apply py-12 text-center text-muted;
+}
+
+/* Stacked layout: each row becomes a block of label/value pairs. */
+.admin-table--stacked,
+.admin-table--stacked tbody {
+  @apply block;
+}
+
+.admin-table--stacked thead {
+  @apply sr-only;
+}
+
+.admin-table--stacked tr {
+  @apply grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-4 gap-y-3 px-3 py-4 border-t border-line;
+}
+
+.admin-table--stacked tbody tr:first-child {
+  @apply border-t-0;
+}
+
+.admin-table--stacked td {
+  @apply flex flex-col items-start gap-1 min-w-0 p-0 border-0 text-left;
+}
+
+.admin-table--stacked td.text-right {
+  @apply text-left;
+}
+
+.admin-table--stacked td[data-label]::before {
+  @apply content-[attr(data-label)] text-[11.5px] font-medium text-muted;
+}
+
+/* The leading identity cell and the actions cell each take a full line. */
+.admin-table--stacked td:first-child,
+.admin-table--stacked td[data-actions] {
+  @apply col-span-full;
+}
+
+.admin-table--stacked td:first-child::before,
+.admin-table--stacked td[data-actions]::before {
+  @apply hidden;
+}
+
+.admin-table--stacked .admin-row-actions {
+  @apply flex-wrap justify-start;
+}
+
+.admin-table--stacked .admin-table-empty {
+  @apply items-center;
 }
 
 .admin-name-cell {
@@ -346,7 +403,7 @@
 }
 
 .admin-status {
-  @apply inline-flex items-center gap-1.5 px-[10px] py-[2px] rounded-full border border-transparent
+  @apply inline-flex items-center gap-1.5 px-[10px] py-[2px] rounded-full
          text-[12px] leading-normal font-semibold whitespace-nowrap;
 }
 
@@ -355,23 +412,23 @@
 }
 
 .admin-status--active {
-  @apply bg-emerald-50 text-emerald-700 border-emerald-200/60;
+  @apply bg-emerald-50 text-emerald-700;
 }
 
 .admin-status--pending {
-  @apply bg-amber-50 text-amber-700 border-amber-200/60;
+  @apply bg-amber-50 text-amber-700;
 }
 
 .admin-status--inactive {
-  @apply bg-slate-100 text-slate-600;
+  @apply bg-fill text-slate-600;
 }
 
 .admin-status--suspended {
-  @apply bg-rose-50 text-rose-700 border-rose-200/60;
+  @apply bg-rose-50 text-rose-700;
 }
 
 .admin-rating {
-  @apply inline-flex items-center gap-1 font-medium text-dark-900;
+  @apply inline-flex items-center gap-1 font-medium text-dark-900 whitespace-nowrap;
 }
 
 .admin-rating svg {
@@ -390,8 +447,8 @@
 }
 
 .admin-search {
-  @apply flex items-center gap-2 w-full lg:max-w-[360px] h-10 px-4 bg-white rounded-full cursor-text
-         border border-line focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary;
+  @apply flex items-center gap-2 w-full lg:max-w-[360px] h-10 short:h-9 px-3.5 bg-white rounded-[10px] cursor-text
+         transition-shadow focus-within:ring-2 focus-within:ring-primary/15;
 }
 
 .admin-search svg {
@@ -404,30 +461,39 @@
 
 /* Segmented control */
 .admin-filters {
-  @apply inline-flex max-w-full items-center gap-1 p-1 bg-white rounded-full border border-line overflow-x-auto;
+  @apply inline-flex max-w-full items-center gap-1 p-1 bg-white rounded-[10px] overflow-x-auto;
 }
 
 .admin-filter {
-  @apply h-8 px-3.5 rounded-full border-0 bg-transparent text-[13px] leading-none font-medium text-muted
-         whitespace-nowrap cursor-pointer hover:text-primary hover:bg-primary-light transition-colors;
+  @apply h-8 short:h-7 px-3 rounded-[8px] border-0 bg-transparent text-[13px] leading-none font-medium text-muted
+         whitespace-nowrap cursor-pointer hover:text-dark-900 hover:bg-fill transition-colors;
 }
 
 .admin-filter[aria-pressed='true'] {
   @apply bg-primary text-white hover:bg-primary hover:text-white;
 }
 
+/* ListFilters reuses `.admin-filter` for its selects, which sit on the gray page. */
+select.admin-filter {
+  @apply h-9 short:h-8 bg-white text-dark-900 hover:bg-white outline-none focus:ring-2 focus:ring-primary/15;
+}
+
+select.admin-filter[multiple] {
+  @apply h-auto py-1;
+}
+
 /* ---------- Admin: modal ---------- */
 
 .admin-modal-backdrop {
-  @apply fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary-dark/60 backdrop-blur-xs;
+  @apply fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary-dark/50;
 }
 
 .admin-modal {
-  @apply flex flex-col w-full max-h-[90vh] bg-white rounded-[24px] border border-line overflow-hidden;
+  @apply flex flex-col w-full max-h-[90vh] bg-white rounded-[16px] overflow-hidden;
 }
 
 .admin-modal-head {
-  @apply flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-line;
+  @apply flex items-start justify-between gap-4 px-6 pt-5 pb-2;
 }
 
 .admin-modal-title {
@@ -439,11 +505,11 @@
 }
 
 .admin-modal-body {
-  @apply flex flex-col gap-4 px-6 py-5 overflow-y-auto;
+  @apply flex flex-col gap-4 px-6 py-4 overflow-y-auto;
 }
 
 .admin-modal-foot {
-  @apply flex flex-wrap items-center justify-end gap-2 px-6 py-4 border-t border-line bg-surface;
+  @apply flex flex-wrap items-center justify-end gap-2 px-6 pt-2 pb-5;
 }
 
 .admin-field-label {
@@ -451,13 +517,13 @@
 }
 
 .admin-textarea {
-  @apply w-full rounded-[14px] border border-line bg-white px-3.5 py-3 text-[14px] leading-relaxed text-dark-900
-         outline-none resize-y placeholder:text-placeholder
-         focus:border-primary focus:ring-2 focus:ring-primary/20;
+  @apply w-full rounded-[12px] border-0 bg-fill px-3.5 py-3 text-[14px] leading-relaxed text-dark-900
+         outline-none resize-y placeholder:text-placeholder transition-colors
+         focus:bg-fill-strong focus:ring-2 focus:ring-primary/15;
 }
 
 .admin-info-box {
-  @apply rounded-[14px] border border-line p-3.5 text-[13px];
+  @apply rounded-[12px] bg-fill p-3.5 text-[13px];
 }
 
 .admin-info-label {
@@ -467,15 +533,15 @@
 /* ---------- Admin: fees & platform settings ---------- */
 
 .admin-settings {
-  @apply grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_400px] gap-6 items-start;
+  @apply grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-4 items-start;
 }
 
 .admin-settings-groups {
-  @apply flex flex-col gap-6 min-w-0;
+  @apply flex flex-col gap-4 min-w-0;
 }
 
 .admin-settings-group-icon {
-  @apply flex items-center justify-center size-9 shrink-0 rounded-full bg-primary-light text-primary;
+  @apply flex items-center justify-center size-9 shrink-0 rounded-full bg-fill text-primary;
 }
 
 .admin-settings-group-icon svg {
@@ -483,7 +549,7 @@
 }
 
 .admin-setting {
-  @apply flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6 px-5 py-4;
+  @apply flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6 px-5 py-4 short:py-3;
 }
 
 .admin-setting + .admin-setting {
@@ -504,9 +570,9 @@
 
 /* Number input with a unit prefix/suffix, e.g. `$ [ 15.00 ]` or `[ 5.0 ] %` */
 .admin-unit-input {
-  @apply flex items-center w-full sm:w-[168px] h-10 shrink-0 bg-white rounded-[12px] border border-line
+  @apply flex items-center w-full sm:w-[168px] h-10 short:h-9 shrink-0 bg-fill rounded-[10px]
          transition-colors cursor-text
-         focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20;
+         focus-within:bg-fill-strong focus-within:ring-2 focus-within:ring-primary/15;
 }
 
 .admin-unit-input input {
@@ -518,24 +584,16 @@
   @apply flex items-center h-full px-3 text-[13px] font-medium text-muted select-none;
 }
 
-.admin-unit-input span:first-child {
-  @apply border-r border-line;
-}
-
-.admin-unit-input span:last-child {
-  @apply border-l border-line;
-}
-
 .admin-unit-input:has(input:disabled) {
-  @apply bg-surface opacity-60 cursor-not-allowed;
+  @apply opacity-60 cursor-not-allowed;
 }
 
 .admin-unit-input--changed {
-  @apply border-amber-300 bg-amber-50/40;
+  @apply bg-amber-50;
 }
 
 .admin-simulator {
-  @apply xl:sticky xl:top-10;
+  @apply xl:sticky xl:top-6;
 }
 
 .admin-receipt {
@@ -543,7 +601,7 @@
 }
 
 .admin-receipt-row {
-  @apply flex items-center justify-between gap-4 py-2 text-muted;
+  @apply flex items-center justify-between gap-4 py-2 short:py-1.5 text-muted;
 }
 
 .admin-receipt-row strong {
@@ -559,7 +617,7 @@
 }
 
 .admin-split-bar {
-  @apply flex h-2.5 w-full overflow-hidden rounded-full bg-line;
+  @apply flex h-2.5 w-full overflow-hidden rounded-full bg-fill-strong;
 }
 
 .admin-split-legend {
@@ -567,7 +625,7 @@
 }
 
 .admin-split-item {
-  @apply flex flex-col gap-0.5 min-w-0 p-3 rounded-[14px] bg-surface;
+  @apply flex flex-col gap-0.5 min-w-0 p-3 rounded-[12px] bg-fill;
 }
 
 .admin-split-item p:first-child {
@@ -583,6 +641,7 @@
 }
 
 .admin-date-input {
-  @apply h-9 px-3 rounded-[12px] border border-line bg-white text-[13px] text-dark-900 outline-none focus:border-primary;
+  @apply h-9 short:h-8 px-3 rounded-[10px] border-0 bg-white text-[13px] text-dark-900 outline-none
+         focus:ring-2 focus:ring-primary/15;
 }
 }

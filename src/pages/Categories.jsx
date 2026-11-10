@@ -243,7 +243,7 @@ const Categories = () => {
               />
             </label>
 
-            <label className="flex items-center gap-3 p-3.5 rounded-[18px] border border-line cursor-pointer select-none">
+            <label className="flex items-center gap-3 p-3.5 rounded-[12px] bg-fill cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={isActive}
