@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Lock } from 'lucide-react'
 import logo from '../assets/logo.png'
 import {
   PASSWORD_HINT,
@@ -12,16 +11,17 @@ import {
 
 // Steps: 'login' → (forgot) 'email' → 'code' → 'reset' → back to 'login'.
 const HEADINGS = {
-  login: ['Welcome back', 'Sign in to manage JobHopper operations.'],
+  login: ['Sign in to the JobHopper admin console', ''],
   email: ['Reset your password', "Enter your admin email and we'll send you a 5-digit code."],
   code: ['Check your email', 'Enter the 5-digit code we sent. It expires after 10 minutes.'],
   reset: ['Choose a new password', 'You’ll be signed out of every device and can sign in with the new password.'],
 }
 
+// Flat style: the placeholder is the visible label; the real label stays for screen readers.
 const Field = ({ label, ...input }) => (
-  <label className="modal-field">
-    <span className="modal-field-label">{label}</span>
-    <input className="modal-field-input" required {...input} />
+  <label className="block">
+    <span className="sr-only">{label}</span>
+    <input className="admin-login-input" placeholder={label} required {...input} />
   </label>
 )
 
@@ -92,7 +92,7 @@ const AdminLogin = ({ onLogin }) => {
 
   const [title, hint] = HEADINGS[step]
   const submitLabel = {
-    login: loading ? 'Signing in…' : 'Sign in to Console',
+    login: loading ? 'Signing in…' : 'Sign in',
     email: loading ? 'Sending…' : 'Send reset code',
     code: loading ? 'Checking…' : 'Verify code',
     reset: loading ? 'Saving…' : 'Set new password',
@@ -100,116 +100,116 @@ const AdminLogin = ({ onLogin }) => {
 
   return (
     <main className="admin-login">
-      <span className="admin-login-glow" aria-hidden="true" />
+      <header className="admin-login-top">
+        <img src={logo} alt="JobHopper" className="admin-logo" />
+      </header>
 
-      <form className="admin-login-card" onSubmit={submit}>
-        <div className="admin-login-head">
-          <img src={logo} alt="JobHopper" className="admin-logo" />
-          <span className="admin-badge">
-            <Lock strokeWidth={2} />
-            Admin Portal
-          </span>
-        </div>
+      <div className="admin-login-body">
+        <form className="admin-login-form" onSubmit={submit}>
+          <h1 className="admin-login-title">{title}</h1>
+          {hint && <p className="admin-login-hint">{hint}</p>}
 
-        <div className="modal-heading">
-          <h1 className="modal-title">{title}</h1>
-          <p className="modal-hint">{hint}</p>
-        </div>
-
-        <div className="modal-fields">
-          {(step === 'login' || step === 'email') && (
-            <Field
-              label="Admin Email"
-              type="email"
-              autoComplete="username"
-              placeholder="admin@jobhopper.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          )}
-
-          {step === 'login' && (
-            <Field
-              label="Password"
-              type="password"
-              autoComplete="current-password"
-              placeholder="••••••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          )}
-
-          {step === 'code' && (
-            <Field
-              label={`Code sent to ${email}`}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="\d{5}"
-              maxLength={5}
-              placeholder="12345"
-              title="The 5-digit code from the email"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-              autoFocus
-            />
-          )}
-
-          {step === 'reset' && (
-            <>
+          <div className="admin-login-fields">
+            {(step === 'login' || step === 'email') && (
               <Field
-                label="New password"
+                label="Email"
+                type="email"
+                autoComplete="username"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            )}
+
+            {step === 'login' && (
+              <Field
+                label="Password"
                 type="password"
-                autoComplete="new-password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            )}
+
+            {step === 'code' && (
+              <Field
+                label={`5-digit code sent to ${email}`}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="\d{5}"
+                maxLength={5}
+                title="The 5-digit code from the email"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
                 autoFocus
               />
-              <Field
-                label="Confirm new password"
-                type="password"
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-              <p className="modal-hint">{PASSWORD_HINT}</p>
-            </>
-          )}
-
-          {notice && !error && <p className="modal-hint text-emerald-700" role="status">{notice}</p>}
-          {error && <p className="modal-error" role="alert">{error}</p>}
-        </div>
-
-        <button type="submit" className="modal-btn modal-btn-primary" disabled={loading}>
-          {submitLabel}
-        </button>
-
-        {step === 'login' ? (
-          <button type="button" className="admin-link self-center" onClick={() => { setNotice(''); goTo('email') }}>
-            Forgot password?
-          </button>
-        ) : (
-          <div className="flex items-center justify-center gap-4">
-            {step === 'code' && (
-              <button
-                type="button"
-                className="admin-link"
-                disabled={loading}
-                onClick={() =>
-                  run(async () => {
-                    await requestPasswordReset(email)
-                    setNotice('A new code has been sent.')
-                  })
-                }
-              >
-                Resend code
-              </button>
             )}
-            <button type="button" className="admin-link" onClick={() => { setNotice(''); goTo('login') }}>
-              Back to sign in
-            </button>
+
+            {step === 'reset' && (
+              <>
+                <Field
+                  label="New password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  autoFocus
+                />
+                <Field
+                  label="Confirm new password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+                <p className="px-1 text-[13px] leading-normal text-muted">{PASSWORD_HINT}</p>
+              </>
+            )}
+
+            {notice && !error && (
+              <p className="admin-login-note bg-accent-light text-emerald-700" role="status">{notice}</p>
+            )}
+            {error && <p className="admin-login-note bg-rose-50 text-rose-600" role="alert">{error}</p>}
           </div>
-        )}
-      </form>
+
+          <button type="submit" className="admin-login-submit" disabled={loading}>
+            {submitLabel}
+          </button>
+
+          <div className="admin-login-links">
+            {step === 'login' ? (
+              <button type="button" className="admin-login-link" onClick={() => { setNotice(''); goTo('email') }}>
+                Forgot password?
+              </button>
+            ) : (
+              <>
+                {step === 'code' && (
+                  <button
+                    type="button"
+                    className="admin-login-link"
+                    disabled={loading}
+                    onClick={() =>
+                      run(async () => {
+                        await requestPasswordReset(email)
+                        setNotice('A new code has been sent.')
+                      })
+                    }
+                  >
+                    Didn’t get it? Resend code
+                  </button>
+                )}
+                <button type="button" className="admin-login-link" onClick={() => { setNotice(''); goTo('login') }}>
+                  Back to sign in
+                </button>
+              </>
+            )}
+          </div>
+        </form>
+      </div>
+
+      <footer className="admin-login-foot">
+        <span>© {new Date().getFullYear()} JobHopper</span>
+        <span>Authorized administrators only</span>
+      </footer>
     </main>
   )
 }

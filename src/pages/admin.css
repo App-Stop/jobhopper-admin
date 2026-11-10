@@ -5,32 +5,71 @@
 
 /* ---------- Admin: login ---------- */
 
+/* Flat style: filled fields and buttons, no borders or shadows. */
 .admin-login {
-  @apply relative flex items-center justify-center min-h-screen px-4 py-10 overflow-hidden bg-surface text-dark-900;
+  @apply flex flex-col min-h-screen px-4 sm:px-6 bg-white text-dark-900;
 }
 
-/* JobHopper navy/green subtle atmospheric glow */
-.admin-login-glow {
-  @apply absolute -top-40 left-0 w-full h-80 pointer-events-none
-         bg-[radial-gradient(60%_100%_at_70%_100%,rgba(30,58,95,0.25),transparent_70%),radial-gradient(40%_100%_at_15%_100%,rgba(16,185,129,0.20),transparent_70%)]
-         blur-2xl;
+.admin-login-top {
+  @apply flex items-center h-16 sm:h-20;
 }
 
-.admin-login-card {
-  @apply relative flex flex-col gap-[28px] w-full max-w-[440px] p-6 sm:p-10 bg-white rounded-[28px]
-         border border-line;
+.admin-login-top .admin-logo {
+  @apply h-6;
 }
 
-.admin-login-head {
-  @apply flex items-center justify-between;
+.admin-login-body {
+  @apply flex flex-1 items-center justify-center py-10;
+}
+
+.admin-login-form {
+  @apply flex flex-col items-stretch w-full max-w-[360px];
+}
+
+.admin-login-title {
+  @apply text-center text-[28px] sm:text-[30px] leading-[1.2] font-medium tracking-[-0.02em] text-dark-900;
+}
+
+.admin-login-hint {
+  @apply mt-3 text-center text-[14px] leading-normal text-muted;
+}
+
+.admin-login-fields {
+  @apply flex flex-col gap-3 mt-9;
+}
+
+.admin-login-input {
+  @apply w-full h-12 px-4 rounded-[12px] border-0 bg-[#f2f3f5] text-[15px] text-dark-900 outline-none
+         transition-colors placeholder:text-placeholder hover:bg-[#eceef1]
+         focus:bg-[#eceef1] focus:ring-2 focus:ring-primary/20;
+}
+
+.admin-login-note {
+  @apply px-4 py-3 rounded-[12px] text-[13px] leading-normal;
+}
+
+.admin-login-submit {
+  @apply flex items-center justify-center w-full h-12 mt-6 rounded-[12px] border-0 bg-primary
+         text-[15px] font-medium text-white cursor-pointer transition-colors
+         enabled:hover:bg-primary-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30
+         focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed;
+}
+
+.admin-login-links {
+  @apply flex flex-col items-center gap-3 mt-6;
+}
+
+.admin-login-link {
+  @apply p-0 border-0 bg-transparent text-[13px] text-muted underline underline-offset-4
+         decoration-line-strong cursor-pointer transition-colors hover:text-dark-900 disabled:opacity-50;
+}
+
+.admin-login-foot {
+  @apply flex flex-wrap items-center justify-center gap-x-4 gap-y-1 py-6 text-[12px] text-muted-light;
 }
 
 .admin-logo {
   @apply block h-8 w-auto object-contain;
-}
-
-.admin-login-head .admin-logo {
-  @apply box-content px-3 py-2 rounded-[14px] bg-primary brightness-0 invert;
 }
 
 .admin-badge {
