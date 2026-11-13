@@ -5,7 +5,7 @@ import { categoryNames, formatDateTime, formatMoney } from '../constants'
 
 const text = (value) => value == null || value === '' ? '—' : String(value).replace(/_/g, ' ')
 const Field = ({ label, children }) => <div><dt className="admin-info-label">{label}</dt><dd className="whitespace-pre-wrap break-words">{children ?? '—'}</dd></div>
-const Person = ({ label, person }) => <Field label={label}>{person ? <>{person.fullName || 'Unnamed account'}<br /><span className="text-muted">{[person.email, person.phone].filter(Boolean).join(' · ') || 'No contact details'}{person.isDeleted ? ' · Deleted account' : person.isDeactivated ? ' · Deactivated' : ''}</span></> : 'Unavailable account'}</Field>
+const Person = ({ label, person }) => <Field label={label}>{person ? <>{person.fullName || 'Unnamed account'}<br /><span className="text-muted">{[person.email, person.phone].filter(Boolean).join(' · ') || 'No contact details'}{person.isDeactivated ? ' · Deactivated' : ''}</span></> : 'Unavailable account'}</Field>
 const Stats = ({ values, labels }) => <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3">{Object.entries(labels).map(([key, label]) => <div className="admin-info-box" key={key}><Field label={label}>{values?.[key] ?? '—'}</Field></div>)}</dl>
 
 function ActivityRecord({ item, kind }) {

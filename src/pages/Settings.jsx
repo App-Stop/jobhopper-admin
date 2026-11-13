@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Check, ListChecks, Receipt, RotateCcw, Save, Scale, ShieldCheck, Wallet, Zap } from 'lucide-react'
+import { ListChecks, Receipt, Scale, ShieldCheck, Wallet, Zap } from 'lucide-react'
 import { AdminHeader } from './AdminParts'
 import { apiRequest } from '../api/client'
 
-// Placeholders shown until GET /admin/settings answers; editing stays locked until then.
+// Placeholders shown until GET /admin/settings answers.
 const DEFAULTS = {
   platformFeePercent: 5.0,
   priorityFeeFlat: 15.0,
@@ -210,14 +210,8 @@ const FieldOptions = () => {
 
 const Settings = () => {
   const [values, setValues] = useState(DEFAULTS)
-  const [baseline, setBaseline] = useState(DEFAULTS)
   // Veriff toggle (boolean, kept apart from the numeric fields).
   const [veriff, setVeriff] = useState(false)
-  const [veriffBaseline, setVeriffBaseline] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [status, setStatus] = useState(null) // { type: 'saved' | 'error', message }
-  // Editing stays locked until the live values load, so a save can never write DEFAULTS over real rates.
-  const [loaded, setLoaded] = useState(false)
   const [loadError, setLoadError] = useState(null)
   const [loadAttempt, setLoadAttempt] = useState(0)
 
@@ -234,10 +228,7 @@ const Settings = () => {
         if (KEYS.some((key) => typeof d[key] !== 'number') || typeof d.veriffEnabled !== 'boolean') throw new Error('The server returned incomplete platform settings.')
         const live = Object.fromEntries(KEYS.map((k) => [k, d[k] ?? DEFAULTS[k]]))
         setValues(live)
-        setBaseline(live)
         setVeriff(d.veriffEnabled === true)
-        setVeriffBaseline(d.veriffEnabled === true)
-        setLoaded(true)
       } catch (err) {
         setLoadError(err.message || 'Failed to load the current fee settings.')
       }
@@ -245,51 +236,8 @@ const Settings = () => {
     load()
   }, [loadAttempt])
 
-  const isChanged = (key) => num(values[key]) !== num(baseline[key]) || values[key] === ''
-  const veriffChanged = veriff !== veriffBaseline
-  const dirty = KEYS.some(isChanged) || veriffChanged
-
-  const setField = (key) => (e) => {
-    setValues((v) => ({ ...v, [key]: e.target.value }))
-    setStatus(null)
-  }
-
-  const handleDiscard = () => {
-    setValues(baseline)
-    setVeriff(veriffBaseline)
-    setStatus(null)
-  }
-
-  const handleSave = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    setStatus(null)
-    // The PATCH body is strict; send only what changed.
-    const payload = Object.fromEntries(KEYS.filter(isChanged).map((k) => [k, Number(values[k])]))
-    if (veriffChanged) payload.veriffEnabled = veriff
-    try {
-      const res = await apiRequest('/admin/settings', {
-        method: 'PATCH',
-        body: JSON.stringify(payload),
-      })
-      // The PATCH response carries the stored settings; treat those as the new source of truth.
-      const saved = Object.fromEntries(KEYS.map((k) => [k, res?.data?.[k] ?? payload[k] ?? values[k]]))
-      setValues(saved)
-      setBaseline(saved)
-      const savedVeriff = res?.data?.veriffEnabled ?? veriff
-      setVeriff(savedVeriff)
-      setVeriffBaseline(savedVeriff)
-      setStatus({ type: 'saved', message: 'Changes saved' })
-      setTimeout(() => setStatus((s) => (s?.type === 'saved' ? null : s)), 3000)
-    } catch (err) {
-      setStatus({ type: 'error', message: err.message || 'Save failed' })
-    } finally {
-      setSaving(false)
-    }
-  }
-
   // Simulator math mirrors job-hopper-backend payment.service computeFees (each fee rounded to
-  // cents) and uses the values currently in the form, saved or not.
+  // cents) and uses the current platform settings.
   const round2 = (v) => Math.round(v * 100) / 100
   const baseJob = num(testAmount)
   const priorityAdd = testIsUrgent ? num(values.priorityFeeFlat) : 0
@@ -310,37 +258,14 @@ const Settings = () => {
     <div className="admin-page">
       <AdminHeader
         title="Fees & Platform"
-        subtitle="Marketplace-wide fees, time windows and verification rules. Commission and tax apply to every job paid after you save; the priority fee and request timeouts apply to jobs posted after you save."
-        actions={
-          <>
-            {status?.type === 'saved' && (
-              <span className="admin-badge admin-badge--accent" role="status">
-                <Check strokeWidth={2.5} /> {status.message}
-              </span>
-            )}
-            {status?.type === 'error' && (
-              <span className="text-[13px] font-medium text-rose-600" role="alert">
-                {status.message}
-              </span>
-            )}
-            {dirty && !status && (
-              <span className="text-[13px] font-medium text-amber-700">Unsaved changes</span>
-            )}
-            <button type="button" className="btn btn-outline" onClick={handleDiscard} disabled={!loaded || !dirty || saving}>
-              <RotateCcw strokeWidth={2} /> Discard
-            </button>
-            <button type="submit" form="fee-settings" className="btn btn-primary" disabled={!loaded || !dirty || saving}>
-              <Save strokeWidth={2} /> {saving ? 'Saving…' : 'Save changes'}
-            </button>
-          </>
-        }
+        subtitle="View marketplace-wide fees, time windows and verification rules. These settings are read-only."
       />
 
       <div className="admin-settings">
-        <form id="fee-settings" onSubmit={handleSave} className="admin-settings-groups">
+        <div className="admin-settings-groups">
           {loadError && (
             <p className="rounded-[12px] bg-rose-50 px-4 py-3 text-[13.5px] text-rose-700" role="alert">
-              Couldn't load the current fee settings: {loadError} Editing is disabled until settings load. <button type="button" className="btn btn-sm btn-outline" onClick={() => setLoadAttempt((value) => value + 1)}>Retry</button>
+              Couldn't load the current fee settings: {loadError} <button type="button" className="btn btn-sm btn-outline" onClick={() => setLoadAttempt((value) => value + 1)}>Retry</button>
             </p>
           )}
           {GROUPS.map(({ title, hint, icon: Icon, fields }) => (
@@ -369,9 +294,7 @@ const Settings = () => {
                   <UnitInput
                     aria-label={label}
                     value={values[key]}
-                    onChange={setField(key)}
-                    changed={isChanged(key)}
-                    disabled={!loaded || saving}
+                    readOnly
                     {...input}
                   />
                 </div>
@@ -389,7 +312,7 @@ const Settings = () => {
                 <p className="admin-card-hint">How submitted worker ID photos are checked.</p>
               </div>
             </div>
-            <label className="admin-setting cursor-pointer select-none">
+            <label className="admin-setting">
               <div className="admin-setting-text">
                 <p className="admin-setting-label">Automatic checks with Veriff</p>
                 <p className="admin-setting-hint">
@@ -401,24 +324,20 @@ const Settings = () => {
               <input
                 type="checkbox"
                 aria-label="Automatic checks with Veriff"
-                className="size-5 accent-primary cursor-pointer"
+                className="size-5 accent-primary"
                 checked={veriff}
-                disabled={!loaded || saving}
-                onChange={(e) => {
-                  setVeriff(e.target.checked)
-                  setStatus(null)
-                }}
+                disabled
               />
             </label>
           </section>
-        </form>
+        </div>
 
         <section className="admin-card admin-simulator">
           <div className="admin-card-head">
             <div className="min-w-0">
               <h2 className="admin-card-title">Checkout simulator</h2>
               <p className="admin-card-hint">
-                {dirty ? 'Previewing your unsaved rates.' : 'Previewing the live rates.'}
+                Previewing the live rates.
               </p>
             </div>
             <span className="admin-badge">Live preview</span>

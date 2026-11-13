@@ -135,8 +135,6 @@ const Jobs = () => {
         { key: 'urgency', label: 'Urgency', options: ['standard', 'within_24h', 'asap'] },
         { key: 'from', label: 'Created from', type: 'date' }, { key: 'to', label: 'Created to', type: 'date' },
         { key: 'scheduledFrom', label: 'Scheduled from', type: 'date' }, { key: 'scheduledTo', label: 'Scheduled to', type: 'date' },
-        { key: 'clientId', label: 'Client account ID', pattern: '[a-fA-F0-9]{24}', title: '24-character account ID' },
-        { key: 'workerId', label: 'Worker account ID', pattern: '[a-fA-F0-9]{24}', title: '24-character account ID' },
       ]} onApply={(values) => { setFilters(values); setFilter('All'); setPage(1) }} />
       {loading && <p role="status">Loading jobs…</p>}
       {error && <p role="alert" className="text-rose-600">Couldn’t load jobs: {error}</p>}

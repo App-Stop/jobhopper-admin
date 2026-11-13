@@ -47,7 +47,7 @@ const Party = ({ label, person }) => (
       <p className="text-[12px] text-muted">
         {[person.email, person.phone].filter(Boolean).join(' · ')}
         {person.isDeactivated && ' · Deactivated'}
-        {person.isDeleted && ' · Deleted account'}
+
       </p>
     )}
   </div>

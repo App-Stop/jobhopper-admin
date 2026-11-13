@@ -6,7 +6,7 @@ import { formatDateTime } from '../constants'
 
 const STATUSES = ['All', 'open', 'under_review', 'resolved']
 const label = (value) => value.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
-const Person = ({ person }) => <div><NameCell name={person?.fullName || 'Unavailable account'} sub={[person?.email, person?.phone].filter(Boolean).join(' · ')} />{person?.isDeleted && <p>Deleted account</p>}{person?.isDeactivated && <p>Deactivated</p>}</div>
+const Person = ({ person }) => <div><NameCell name={person?.fullName || 'Unavailable account'} sub={[person?.email, person?.phone].filter(Boolean).join(' · ')} />{person?.isDeactivated && <p>Deactivated</p>}</div>
 
 export default function Moderation({ kind }) {
   const tickets = kind === 'support-tickets'
@@ -136,7 +136,7 @@ export default function Moderation({ kind }) {
     <AdminHeader title={title} count={pagination?.total ?? rows.length} subtitle={tickets ? 'Review support requests and send a resolution answer to the user.' : 'Review reports about people. Resolving a report does not deactivate the account.'} actions={<RefreshButton onRefresh={load} />} />
     <AdminToolbar query={query} onQuery={setQuery} placeholder={tickets ? 'Search subject, name, email or phone' : 'Search reporter or reported user'} filters={STATUSES} filter={status} onFilter={(value) => { setStatus(value); setPage(1) }} filterLabel="Filter by status" renderFilter={(value) => `${label(value)} (${value === 'All' ? Object.values(counts).reduce((sum, n) => sum + n, 0) : counts[value] ?? 0})`} />
     {!tickets && <label>Reporter role <select className="admin-filter" value={role} onChange={(e) => { setRole(e.target.value); setPage(1) }}><option value="">All roles</option><option value="client">Client</option><option value="worker">Worker</option></select></label>}
-    {!tickets && <ListFilters fields={[{ key: 'reason', label: 'Reason', options: reasons }, { key: 'reportedUserId', label: 'Reported account ID', pattern: '[a-fA-F0-9]{24}', title: '24-character account ID' }]} onApply={(values) => { setReportFilters(values); setPage(1) }} />}
+    {!tickets && <ListFilters fields={[{ key: 'reason', label: 'Reason', options: reasons }]} onApply={(values) => { setReportFilters(values); setPage(1) }} />}
     {optionsError && <p role="alert" className="text-rose-600">Couldn’t load report reasons: {optionsError} <button className="btn btn-sm btn-outline" onClick={() => setOptionsAttempt((value) => value + 1)}>Retry</button></p>}
     {error && <p role="alert" className="text-rose-600">Couldn’t load {title.toLowerCase()}: {error} <button className="btn btn-sm btn-outline" onClick={load}>Retry</button></p>}
     {loading && <p role="status">Loading…</p>}

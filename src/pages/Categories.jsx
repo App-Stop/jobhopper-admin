@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
-import { AdminHeader, AdminModal, AdminTable, AdminToolbar, FileImage, NameCell, RefreshButton, StatusPill } from './AdminParts'
+import { AdminHeader, AdminModal, AdminTable, AdminToolbar, NameCell, RefreshButton, StatusPill } from './AdminParts'
 import { apiRequest, apiRequestAll } from '../api/client'
 
 const FILTERS = ['All', 'Active', 'Inactive']
@@ -18,7 +18,6 @@ const Categories = () => {
   const [error, setError] = useState(null)
   const [actionError, setActionError] = useState('')
   const [sortOrder, setSortOrder] = useState(0)
-  const [icon, setIcon] = useState(null)
   const busy = useRef(false)
 
   const loadCategories = async () => {
@@ -42,7 +41,6 @@ const Categories = () => {
     setIsActive(true)
     setSortOrder(0)
     setActionError('')
-    setIcon(null)
     setModalOpen(true)
   }
 
@@ -53,7 +51,6 @@ const Categories = () => {
     setIsActive(c.isActive !== false)
     setSortOrder(c.sortOrder ?? 0)
     setActionError('')
-    setIcon(null)
     setModalOpen(true)
   }
 
@@ -75,7 +72,6 @@ const Categories = () => {
     e.preventDefault()
     if (!name.trim()) return
     if (busy.current) return
-    if (icon && icon.size > 25 * 1024 * 1024) { setActionError('The icon must be 25 MB or smaller.'); return }
     busy.current = true
     setLoading(true)
     setActionError('')
@@ -85,7 +81,6 @@ const Categories = () => {
       body.set('description', description.trim())
       body.set('isActive', String(isActive))
       body.set('sortOrder', String(sortOrder))
-      if (icon) body.set('icon', icon)
       await apiRequest(editingCat ? `/categories/${editingCat._id}` : '/categories', { method: editingCat ? 'PATCH' : 'POST', body })
       setModalOpen(false)
       loadCategories()
@@ -121,7 +116,6 @@ const Categories = () => {
         />
       ),
     },
-    { key: 'icon', label: 'Icon', render: (c) => c.icon && <FileImage key={c.icon._id} file={c.icon} className="size-10" /> },
     { key: 'sortOrder', label: 'Sort order' },
     {
       key: 'description',
@@ -201,7 +195,7 @@ const Categories = () => {
           as="form"
           onSubmit={handleSave}
           size="max-w-md"
-          title={editingCat ? 'Edit trade category' : 'New trade category'}
+          title={editingCat ? 'Edit category' : 'New trade category'}
           subtitle={editingCat ? `/${editingCat.slug || editingCat.name.toLowerCase().replace(/\s+/g, '-')}` : 'Shown to clients when posting a job.'}
           onClose={() => { if (!busy.current) setModalOpen(false) }}
           footer={
@@ -218,7 +212,6 @@ const Categories = () => {
           <div className="modal-fields">
             {actionError && <p role="alert" className="text-rose-600">{actionError}</p>}
             <label className="modal-field"><span className="modal-field-label">Sort order</span><input className="modal-field-input" type="number" min="0" step="1" required value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} /></label>
-            <label className="modal-field"><span className="modal-field-label">Category icon (optional, up to 25 MB)</span>{editingCat?.icon && <FileImage file={editingCat.icon} className="size-16" />}<input key={editingCat?._id || 'new'} type="file" accept="image/*" onChange={(e) => setIcon(e.target.files?.[0] || null)} /></label>
             <label className="modal-field">
               <span className="modal-field-label">Category name</span>
               <input

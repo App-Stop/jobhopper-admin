@@ -2,7 +2,7 @@
 
 Audited against `../job-hopper-backend/src/feature/*/*.routes.js`, the admin validators, controllers, services, transformers and OpenAPI schemas.
 
-All 33 routes under `/admin` and all 3 category mutation routes have frontend integrations. The 5 legacy `/reports` routes alias the same handlers used by `/admin/disputes`; they do not require another screen.
+The admin screens integrate the routes below; platform settings are read-only. The 5 legacy `/reports` routes alias the same handlers used by `/admin/disputes`; they do not require another screen.
 
 | Module / page | Backend routes | Frontend behavior |
 | --- | --- | --- |
@@ -11,14 +11,14 @@ All 33 routes under `/admin` and all 3 category mutation routes have frontend in
 | Dashboard | GET `/admin/overview` | Marketplace overview, recent jobs and pending verifications |
 | Users | GET `/admin/users`, GET `/admin/users/:id`, PATCH `/admin/users/:id/deactivate` | Server search, role/status/join-date filters, pagination, profile and activity details, deactivate/reactivate |
 | Verification Queue | GET `/admin/workers/verification-queue`, PATCH `/admin/workers/:id/verification` | Queue/status filters, documents, approve/reject with reason |
-| Jobs & Orders | GET `/admin/jobs`, GET `/admin/jobs/:id` | Server search, grouped/exact statuses, post type, urgency, creation/scheduled dates, client/worker IDs, pagination; applicants, payment/refunds, cancellation, dispute summary and status history |
+| Jobs & Orders | GET `/admin/jobs`, GET `/admin/jobs/:id` | Server search, grouped/exact statuses, post type, urgency, creation/scheduled dates, pagination; applicants, payment/refunds, cancellation, dispute summary and status history |
 | Open Requests | GET `/admin/open-requests`, GET `/admin/open-requests/:id` | Search, post type, urgency, counts, pagination and request details |
 | Payouts | GET `/admin/payouts`, GET `/admin/payouts/:id` | Search, single/multiple statuses, date range, counts, pagination, bank/payment/failure details |
 | Disputes | GET `/admin/disputes`, GET/PATCH `/admin/disputes/:id`, POST `/admin/disputes/:id/requests`, POST `/admin/disputes/:id/resolve` | Server search/status/pagination, detail/evidence, mark under review, ask either party for evidence, resolve with refund and note |
 | Support Tickets | GET `/admin/support-tickets`, GET/PATCH `/admin/support-tickets/:id` | Search/status/counts/pagination, detail, under review, resolve with an optional user-visible answer |
-| User Reports | GET `/admin/user-reports`, GET/PATCH `/admin/user-reports/:id` | Search/status/reporter-role/reason/reported-account filters, counts/pagination, both people, related report count, review/resolve with internal note |
-| Categories | GET `/admin/categories`, POST `/categories`, PATCH/DELETE `/categories/:id` | Active/inactive list and search, create/edit/delete, multipart icon upload/replacement, nonnegative integer sort order |
-| Fees & Platform | GET/PATCH `/admin/settings`, GET `/admin/field-options` | Every supported setting, Veriff toggle, checkout preview, read-only choice lists |
+| User Reports | GET `/admin/user-reports`, GET/PATCH `/admin/user-reports/:id` | Search/status/reporter-role/reason filters, counts/pagination, both people, related report count, review/resolve with internal note |
+| Categories | GET `/admin/categories`, POST `/categories`, PATCH/DELETE `/categories/:id` | Active/inactive list and search, create/edit/delete, nonnegative integer sort order |
+| Fees & Platform | GET `/admin/settings`, GET `/admin/field-options` | Read-only settings and Veriff status, checkout preview, read-only choice lists |
 
 Private images use authenticated GET `/files/:id/content`. Its 401 handling now follows the session-expiry flow used by JSON requests.
 

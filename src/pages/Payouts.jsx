@@ -269,7 +269,7 @@ const Payouts = () => {
                   <p className="text-[12px] text-muted">
                     {[detail.worker?.email, detail.worker?.phone].filter(Boolean).join(' · ')}
                     {detail.worker?.isDeactivated && ' · Deactivated'}
-                    {detail.worker?.isDeleted && ' · Deleted account'}
+
                   </p>
                 </div>
                 <div className="admin-info-box">
