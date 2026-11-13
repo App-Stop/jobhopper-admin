@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiRequest } from '../api/client'
 
-export default function useAdminList(endpoint, key, params = {}) {
+export default function useAdminList(endpoint, key, params = {}, limit = 25) {
   const [query, setQuery] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -25,7 +25,7 @@ export default function useAdminList(endpoint, key, params = {}) {
       setLoading(false)
       return () => controller.abort()
     }
-    const queryParams = new URLSearchParams({ page, limit: 25 })
+    const queryParams = new URLSearchParams({ page, limit })
     if (search) queryParams.set('search', search)
     Object.entries(filters).forEach(([name, value]) => { if (value !== '' && value != null) queryParams.set(name, value) })
     setLoading(true)
@@ -38,6 +38,6 @@ export default function useAdminList(endpoint, key, params = {}) {
       if (page > last) setPage(last)
     }).catch((err) => { if (!controller.signal.aborted) setError(err.message) }).finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [endpoint, key, serialized, search, page, revision])
+  }, [endpoint, key, serialized, search, page, revision, limit])
   return { rows: data[key] || [], counts: data.counts || {}, pagination: data.pagination, query, setQuery, page, setPage, error, loading, refresh }
 }

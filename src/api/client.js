@@ -64,7 +64,9 @@ export async function apiRequest(endpoint, options = {}) {
   }
 
   if (!res.ok) {
-    throw new Error(errorMessage(json, res.status))
+    const error = new Error(res.status === 403 ? 'Access denied' : errorMessage(json, res.status))
+    error.status = res.status
+    throw error
   }
   return json
 }

@@ -89,3 +89,15 @@ test('private-file authentication failures also sign out the admin', async () =>
   assert.equal(api.getStoredAuth(), null)
   assert.deepEqual(api.events, ['auth:unauthorized'])
 })
+
+test('verification conflict and missing-record errors preserve HTTP status for recovery', async () => {
+  for (const status of [400, 404, 422, 500]) {
+    const api = setup(async () => response(status, { message: 'Verification error' }))
+    await assert.rejects(api.apiRequest('/admin/verifications/verification-id'), (error) => error.status === status && error.message === 'Verification error')
+  }
+})
+
+test('forbidden requests show access denied', async () => {
+  const api = setup(async () => response(403, { message: 'Forbidden' }))
+  await assert.rejects(api.apiRequest('/admin/verifications'), (error) => error.status === 403 && error.message === 'Access denied')
+})

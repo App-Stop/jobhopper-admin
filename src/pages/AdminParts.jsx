@@ -208,7 +208,7 @@ const useStackedLayout = (rows, columnCount) => {
 }
 
 // `columns`: [{ key, label, render?, align? }] — `render` receives the row.
-export const AdminTable = ({ title, action, columns, rows = [], empty = 'Nothing to show yet.', compact = false }) => {
+export const AdminTable = ({ title, action, columns, rows = [], empty = 'Nothing to show yet.', compact = false, onRowClick }) => {
   const [wrapRef, stacked] = useStackedLayout(rows, columns.length)
   const alignClass = (col) => (col.align === 'right' ? 'text-right' : 'text-left')
 
@@ -240,7 +240,7 @@ export const AdminTable = ({ title, action, columns, rows = [], empty = 'Nothing
               </tr>
             ) : (
               rows.map((row, idx) => (
-                <tr key={row._id || row.id || idx}>
+                <tr key={row._id || row.id || idx} onClick={onRowClick ? () => onRowClick(row) : undefined}>
                   {columns.map((col) => (
                     <td
                       key={col.key}

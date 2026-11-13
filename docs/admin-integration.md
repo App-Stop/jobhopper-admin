@@ -10,7 +10,7 @@ The admin screens integrate the routes below; platform settings are read-only. T
 | Account | GET `/admin/me`, PATCH `/admin/change-password` | Session profile refresh and password change |
 | Dashboard | GET `/admin/overview` | Marketplace overview, recent jobs and pending verifications |
 | Users | GET `/admin/users`, GET `/admin/users/:id`, PATCH `/admin/users/:id/deactivate` | Server search, role/status/join-date filters, pagination, profile and activity details, deactivate/reactivate |
-| Verification Queue | GET `/admin/workers/verification-queue`, PATCH `/admin/workers/:id/verification` | Queue/status filters, documents, approve/reject with reason |
+| Verification Queue | GET `/admin/verifications`, GET/PATCH `/admin/verifications/:id` | Counted status tabs, server search, UTC submission dates, pagination, detail drawer, current documents and attempt history, confirmed approve/reject with reason |
 | Jobs & Orders | GET `/admin/jobs`, GET `/admin/jobs/:id` | Server search, grouped/exact statuses, post type, urgency, creation/scheduled dates, pagination; applicants, payment/refunds, cancellation, dispute summary and status history |
 | Open Requests | GET `/admin/open-requests`, GET `/admin/open-requests/:id` | Search, post type, urgency, counts, pagination and request details |
 | Payouts | GET `/admin/payouts`, GET `/admin/payouts/:id` | Search, single/multiple statuses, date range, counts, pagination, bank/payment/failure details |
@@ -33,3 +33,5 @@ Private images use authenticated GET `/files/:id/content`. Its 401 handling now 
 ## Validation
 
 `npm run test` exercises API authorization, validation error messages, multipart uploads, pagination, malformed responses, cancellation/network failures and private-file session expiry. `npm run lint`, `npm run build` and `git diff --check` validate the frontend source/build. Live authenticated end-to-end behavior requires a running configured backend and admin session; it has not been verified here.
+
+The verification page follows `ADMIN_VERIFICATIONS_FRONTEND_INTEGRATION_GUIDE.md`. The local backend checkout inspected during implementation still exposes the legacy worker verification routes; it must provide the new `/admin/verifications` contract before this page can be exercised end to end.

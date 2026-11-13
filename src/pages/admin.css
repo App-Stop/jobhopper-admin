@@ -707,3 +707,15 @@ select.admin-filter[multiple] {
          focus:ring-2 focus:ring-primary/15;
 }
 }
+
+/* Verification detail drawer */
+.admin-modal-backdrop:has(> .verification-drawer) {
+  align-items: stretch;
+  justify-content: flex-end;
+  padding: 0;
+}
+.admin-modal.verification-drawer {
+  max-width: 850px;
+  max-height: 100dvh;
+  border-radius: 16px 0 0 16px;
+}

@@ -3,7 +3,7 @@ import { ChevronRight, DollarSign, Inbox, ShieldCheck, Users, Zap } from 'lucide
 import { AdminHeader, AdminTable, NameCell, RefreshButton, StatCard, StatusPill } from './AdminParts'
 import { adminLinkClick, adminPaths } from '../navigation'
 import { apiRequest } from '../api/client'
-import { categoryNames, formatMoney } from '../constants'
+import { categoryNames, formatMoney, formatDate } from '../constants'
 
 const formatCurrency = (val) =>
   Number(val || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
@@ -44,35 +44,12 @@ const JOB_COLUMNS = [
   },
 ]
 
-// Queue profiles carry `user` as a bare id; `account` is fetched per worker in load().
+// Verification rows include the worker person card.
 const WORKER_COLUMNS = [
-  {
-    key: 'name',
-    label: 'Worker',
-    render: (w) => (
-      <NameCell
-        name={w.account?.fullName || `Worker ···${String(w.user || '').slice(-6)}`}
-        sub={w.account?.email}
-        avatarChar={w.account?.fullName?.[0] || 'W'}
-      />
-    ),
-  },
-  {
-    key: 'service',
-    label: 'Trade',
-    render: (w) => <span>{w.services?.[0]?.category?.name || '—'}</span>,
-  },
-  {
-    key: 'experience',
-    label: 'Experience',
-    align: 'right',
-    render: (w) => <span>{w.yearsExperience ? `${w.yearsExperience} yrs` : '—'}</span>,
-  },
-  {
-    key: 'status',
-    label: 'Status',
-    render: (w) => <StatusPill status={w.verificationStatus} />,
-  },
+  { key: 'worker', label: 'Worker', render: (row) => <NameCell name={row.worker?.fullName || 'Unnamed worker'} sub={row.worker?.email} /> },
+  { key: 'method', label: 'Method', render: (row) => row.method === 'veriff' ? 'Veriff' : row.method === 'manual' ? 'Manual' : '-' },
+  { key: 'submitted', label: 'Submitted', render: (row) => formatDate(row.submittedAt) },
+  { key: 'status', label: 'Status', render: (row) => <StatusPill status={row.status} /> },
 ]
 
 const JOB_GROUPS = [
@@ -124,7 +101,6 @@ const Dashboard = () => {
   const [overviewError, setOverviewError] = useState(null)
   const [recentJobs, setRecentJobs] = useState([])
   const [pendingWorkers, setPendingWorkers] = useState([])
-  const [pendingVerifications, setPendingVerifications] = useState(null)
   const [error, setError] = useState(null)
 
   const loadOverview = async () => {
@@ -141,22 +117,10 @@ const Dashboard = () => {
     try {
       const [jobsRes, queueRes] = await Promise.all([
         apiRequest('/admin/jobs?limit=5'),
-        apiRequest('/admin/workers/verification-queue?status=pending&limit=5'),
+        apiRequest('/admin/verifications?status=pending&limit=5'),
       ])
-      const queue = queueRes?.data?.profiles || []
-
-      // The queue doesn't include the worker's name/email, so look each one up.
-      const accounts = await Promise.all(
-        queue.map((p) =>
-          apiRequest(`/admin/users/${p.user}`)
-            .then((res) => res?.data?.user || null)
-            .catch(() => null),
-        ),
-      )
-
       setRecentJobs(jobsRes?.data?.jobs || [])
-      setPendingWorkers(queue.map((p, i) => ({ ...p, account: accounts[i] })))
-      setPendingVerifications(queueRes?.data?.pagination?.total ?? queue.length)
+      setPendingWorkers(queueRes?.data?.verifications || [])
       setError(null)
     } catch (err) {
       setError(err.message)
@@ -288,7 +252,7 @@ const Dashboard = () => {
 
         <AdminTable
           compact
-          title={pendingVerifications !== null ? `Verification Queue (${formatNumber(pendingVerifications)})` : 'Verification Queue'}
+          title={o?.pendingVerifications != null ? `Verification Queue (${formatNumber(o.pendingVerifications)})` : 'Verification Queue'}
           columns={WORKER_COLUMNS}
           rows={pendingWorkers}
           empty={error ? '—' : 'No pending worker verifications.'}
