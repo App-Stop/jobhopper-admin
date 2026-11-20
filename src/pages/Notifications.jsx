@@ -53,7 +53,7 @@ function ComposeModal({ original, onClose, onSaved, onRequestError }) {
     if (!form.title.trim()) return fail('Enter a title.')
     if (!form.message.trim()) return fail('Enter a message.')
     if (form.mode === 'schedule') {
-      if (!isValidTimeZone(form.timeZone)) return fail('Enter a valid time zone, for example Asia/Karachi.')
+      if (!isValidTimeZone(form.timeZone)) return fail('Pick a time zone.')
       if (!zonedToIso(form.local, form.timeZone)) return fail('Pick a date and time.')
     }
     const body = editing ? editBody(original, form) : createBody(form)
@@ -153,8 +153,9 @@ function ComposeModal({ original, onClose, onSaved, onRequestError }) {
         </label>
         <label className="modal-field">
           <span className="modal-field-label">Time zone</span>
-          <input className="modal-field-input" required list="notification-time-zones" value={form.timeZone} onChange={set('timeZone')} placeholder="Asia/Karachi" />
-          <datalist id="notification-time-zones">{zones.map((zone) => <option key={zone} value={zone} />)}</datalist>
+          <select className="modal-field-input" required value={form.timeZone} onChange={set('timeZone')}>
+            {(zones.includes(form.timeZone) ? zones : [form.timeZone, ...zones]).map((zone) => <option key={zone} value={zone}>{zone.replace(/_/g, ' ')}</option>)}
+          </select>
           <span className="text-[12px] text-muted">Between 1 minute and 1 year from now.{iso && form.timeZone !== localZone ? ` Your time: ${formatInZone(iso, localZone)}.` : ''}</span>
         </label>
       </>}
