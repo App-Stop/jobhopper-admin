@@ -7,6 +7,7 @@ export const adminPaths = {
   openRequests: '/open-requests',
   payouts: '/payouts',
   disputes: '/disputes',
+  notifications: '/notifications',
   categories: '/categories',
   supportTickets: '/support-tickets',
   userReports: '/user-reports',
@@ -22,6 +23,15 @@ export const currentAdminPage = () =>
 export const navigateAdmin = (path) => {
   window.history.pushState(null, '', path)
   window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
+// Builds a link that opens a list page on one of its tabs, e.g. `/jobs?tab=Active`.
+export const tabPath = (path, tab) => `${path}?${new URLSearchParams({ tab })}`
+
+// The `?tab=` the page was opened with, when it is one of `allowed`; otherwise `fallback`.
+export const initialTab = (allowed, fallback = 'All') => {
+  const tab = new URLSearchParams(window.location.search).get('tab')
+  return allowed.includes(tab) ? tab : fallback
 }
 
 // onClick for in-app `<a>` links: keeps modifier-clicks (new tab) working.

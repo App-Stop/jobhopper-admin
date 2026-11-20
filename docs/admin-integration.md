@@ -8,7 +8,7 @@ The admin screens integrate the routes below; platform settings are read-only. T
 | --- | --- | --- |
 | Login and recovery | POST `/admin/login`, `/admin/forgot-password`, `/admin/verify-otp`, `/admin/reset-password` | Login, email recovery, OTP verification, password reset |
 | Account | GET `/admin/me`, PATCH `/admin/change-password` | Session profile refresh and password change |
-| Dashboard | GET `/admin/overview` | Marketplace overview, recent jobs and pending verifications |
+| Dashboard | GET `/admin/overview`, GET `/admin/support-tickets?status=open` (count) | Marketplace overview; Active Jobs / Users / Open Requests cards open their lists (Jobs on the Active tab); Needs attention shows open disputes and open support tickets, linking to their Open tabs; recent jobs and pending verifications |
 | Users | GET `/admin/users`, GET `/admin/users/:id`, PATCH `/admin/users/:id/deactivate` | Server search, role/status/join-date filters, pagination, profile and activity details, deactivate/reactivate |
 | Verification Queue | GET `/admin/verifications`, GET/PATCH `/admin/verifications/:id` | Counted status tabs, server search, UTC submission dates, pagination, detail drawer, current documents and attempt history, confirmed approve/reject with reason |
 | Jobs & Orders | GET `/admin/jobs`, GET `/admin/jobs/:id` | Server search, grouped/exact statuses, post type, urgency, creation/scheduled dates, pagination; applicants, payment/refunds, cancellation, dispute summary and status history |
@@ -17,6 +17,7 @@ The admin screens integrate the routes below; platform settings are read-only. T
 | Disputes | GET `/admin/disputes`, GET/PATCH `/admin/disputes/:id`, POST `/admin/disputes/:id/requests`, POST `/admin/disputes/:id/resolve` | Server search/status/pagination, detail/evidence, mark under review, ask either party for evidence, resolve with refund and note |
 | Support Tickets | GET `/admin/support-tickets`, GET/PATCH `/admin/support-tickets/:id` | Search/status/counts/pagination, detail, under review, resolve with an optional user-visible answer |
 | User Reports | GET `/admin/user-reports`, GET/PATCH `/admin/user-reports/:id` | Search/status/reporter-role/reason filters, counts/pagination, both people, related report count, review/resolve with internal note |
+| Notifications | GET/POST `/admin/notifications`, GET/PATCH `/admin/notifications/:id`, POST `/admin/notifications/:id/cancel`, `/:id/retry`, POST `/admin/notifications/hide`, `/unhide` | Broadcast to all workers / all clients / everyone, send now or schedule (ISO time with the zone offset, 1 minute to 1 year ahead) with a review step; counted status tabs, Hidden view, search, audience and UTC send-date filters; detail with delivery, push and read counts; edit/cancel scheduled, retry failed with last error; 409 refreshes and shows the new status; bulk hide/show again in groups of 100; polls every 5 s while sending; Failed count badge in the sidebar |
 | Categories | GET `/admin/categories`, POST `/categories`, PATCH/DELETE `/categories/:id` | Active/inactive list and search, create/edit/delete, nonnegative integer sort order |
 | Fees & Platform | GET `/admin/settings`, GET `/admin/field-options` | Read-only settings and Veriff status, checkout preview, read-only choice lists |
 
@@ -26,7 +27,7 @@ Private images use authenticated GET `/files/:id/content`. Its 401 handling now 
 
 - User activity lists contain the latest 10 records and a total. No dedicated admin payment/review list or activity-pagination endpoint exists; these are shown in user details using the available API.
 - FAQ and static-content routes are public reads. The backend has no admin CMS mutation endpoints.
-- Chat, calls, notifications, addresses, worker bank accounts and payment methods expose participant/account workflows, not admin management APIs. They are not separate admin modules.
+- Chat, calls, per-user notifications, addresses, worker bank accounts and payment methods expose participant/account workflows, not admin management APIs. They are not separate admin modules.
 - Payout administration is read-only. The backend provides no admin payout approval/retry action.
 - Category icons can be uploaded/replaced. The backend provides no explicit icon removal action.
 
@@ -35,3 +36,7 @@ Private images use authenticated GET `/files/:id/content`. Its 401 handling now 
 `npm run test` exercises API authorization, validation error messages, multipart uploads, pagination, malformed responses, cancellation/network failures and private-file session expiry. `npm run lint`, `npm run build` and `git diff --check` validate the frontend source/build. Live authenticated end-to-end behavior requires a running configured backend and admin session; it has not been verified here.
 
 The verification page follows `ADMIN_VERIFICATIONS_FRONTEND_INTEGRATION_GUIDE.md`. The local backend checkout inspected during implementation still exposes the legacy worker verification routes; it must provide the new `/admin/verifications` contract before this page can be exercised end to end.
+
+The notifications page follows `ADMIN_NOTIFICATIONS_FRONTEND_INTEGRATION_GUIDE.md`. The local backend checkout has no `/admin/notifications` routes yet; it must provide that contract before the page can be exercised end to end. What a tap on the recipient's push does is left to the mobile team (guide section 14).
+
+`GET /admin/overview` has no support-ticket figure, so the dashboard counts open tickets with GET `/admin/support-tickets?status=open&limit=1`. The `openDisputes` overview field links to the Disputes Open tab; if the backend counts every unresolved dispute there, the tab number will be lower than the dashboard number.

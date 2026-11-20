@@ -128,6 +128,11 @@
   @apply bg-primary text-white hover:bg-primary hover:text-white;
 }
 
+.admin-nav-badge {
+  @apply ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-rose-600
+         text-[11px] font-semibold leading-none text-white tabular-nums;
+}
+
 .admin-account {
   @apply flex items-center gap-3 ml-auto lg:ml-0 lg:p-2.5 short:lg:p-2 lg:rounded-[12px] lg:bg-fill;
 }
@@ -269,6 +274,16 @@
 
 .admin-stat--primary .admin-stat-icon {
   @apply bg-white/15 text-white;
+}
+
+/* Stat card that opens its list page */
+.admin-stat--link {
+  @apply no-underline text-inherit cursor-pointer hover:ring-2 hover:ring-primary/20
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40;
+}
+
+.admin-stat--primary.admin-stat--link {
+  @apply hover:bg-primary-dark;
 }
 
 /* ---------- Admin: cards & tables ---------- */

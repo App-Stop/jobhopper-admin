@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Eye, Gavel, MessageSquarePlus, Search as SearchIcon } from 'lucide-react'
 import { AdminHeader, AdminModal, AdminTable, AdminToolbar, FileImage, NameCell, Pager, RefreshButton, StatusPill } from './AdminParts'
+import { initialTab } from '../navigation'
 import { apiRequest } from '../api/client'
 import useAdminList from '../hooks/useAdminList'
 import { formatDate, formatDateTime, formatMoney } from '../constants'
@@ -54,7 +55,7 @@ const Party = ({ label, person }) => (
 )
 
 const Disputes = () => {
-  const [filter, setFilter] = useState('All')
+  const [filter, setFilter] = useState(() => initialTab(FILTERS))
   const { rows: reports, pagination, query, setQuery, page, setPage, error, loading, refresh: loadReports } = useAdminList('/admin/disputes', 'reports', { status: FILTER_STATUSES[filter] || '' })
   const [actionError, setActionError] = useState('')
   const detailRequest = useRef(0)

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiRequest } from '../api/client'
 
 export default function useAdminList(endpoint, key, params = {}, limit = 25) {
@@ -10,7 +10,12 @@ export default function useAdminList(endpoint, key, params = {}, limit = 25) {
   const [loading, setLoading] = useState(true)
   const [revision, setRevision] = useState(0)
   const serialized = JSON.stringify(params)
-  const refresh = useCallback(async () => setRevision((value) => value + 1), [])
+  // `refresh({ silent: true })` reloads without flipping `loading`, for background polling.
+  const silent = useRef(false)
+  const refresh = useCallback(async (options) => {
+    silent.current = options?.silent === true
+    setRevision((value) => value + 1)
+  }, [])
   useEffect(() => {
     const timer = setTimeout(() => { setSearch(query.trim()); setPage(1) }, 300)
     return () => clearTimeout(timer)
@@ -28,7 +33,8 @@ export default function useAdminList(endpoint, key, params = {}, limit = 25) {
     const queryParams = new URLSearchParams({ page, limit })
     if (search) queryParams.set('search', search)
     Object.entries(filters).forEach(([name, value]) => { if (value !== '' && value != null) queryParams.set(name, value) })
-    setLoading(true)
+    if (!silent.current) setLoading(true)
+    silent.current = false
     setError('')
     apiRequest(`${endpoint}?${queryParams}`, { signal: controller.signal }).then((res) => {
       if (!Array.isArray(res?.data?.[key])) throw new Error('Unexpected list response from the server.')

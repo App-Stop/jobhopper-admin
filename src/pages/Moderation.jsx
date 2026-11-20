@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AdminHeader, AdminModal, AdminTable, AdminToolbar, NameCell, Pager, RefreshButton, StatusPill } from './AdminParts'
+import { initialTab } from '../navigation'
 import { apiRequest } from '../api/client'
 import ListFilters from './ListFilters'
 import { formatDateTime } from '../constants'
@@ -14,7 +15,7 @@ export default function Moderation({ kind }) {
   const endpoint = `/admin/${kind}`
   const [query, setQuery] = useState('')
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('All')
+  const [status, setStatus] = useState(() => initialTab(STATUSES))
   const [role, setRole] = useState('')
   const [reportFilters, setReportFilters] = useState({})
   const [reasons, setReasons] = useState([])

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { ChevronRight, DollarSign, Inbox, ShieldCheck, Users, Zap } from 'lucide-react'
 import { AdminHeader, AdminTable, NameCell, RefreshButton, StatCard, StatusPill } from './AdminParts'
-import { adminLinkClick, adminPaths } from '../navigation'
-import { apiRequest } from '../api/client'
+import { adminLinkClick, adminPaths, tabPath } from '../navigation'
+import { apiCount, apiRequest } from '../api/client'
 import { categoryNames, formatMoney, formatDate } from '../constants'
 
 const formatCurrency = (val) =>
@@ -102,6 +102,7 @@ const Dashboard = () => {
   const [recentJobs, setRecentJobs] = useState([])
   const [pendingWorkers, setPendingWorkers] = useState([])
   const [error, setError] = useState(null)
+  const [openTickets, setOpenTickets] = useState(null)
 
   const loadOverview = async () => {
     try {
@@ -127,7 +128,16 @@ const Dashboard = () => {
     }
   }
 
-  const load = () => Promise.all([loadOverview(), loadTables()])
+  // GET /admin/overview has no support-ticket figure, so count open tickets from the list endpoint.
+  const loadTickets = async () => {
+    try {
+      setOpenTickets(await apiCount('/admin/support-tickets', { status: 'open' }))
+    } catch {
+      setOpenTickets(null)
+    }
+  }
+
+  const load = () => Promise.all([loadOverview(), loadTables(), loadTickets()])
 
   useEffect(() => {
     load()
@@ -170,6 +180,7 @@ const Dashboard = () => {
           value={num(o?.jobs?.active)}
           note={o ? `${formatNumber(o.jobs?.total)} jobs in total` : undefined}
           highlight={true}
+          href={tabPath(adminPaths.jobs, 'Active')}
         />
         <StatCard
           icon={DollarSign}
@@ -181,12 +192,14 @@ const Dashboard = () => {
           icon={Users}
           label="Users"
           value={num(o?.users?.total)}
+          href={adminPaths.users}
           note={o ? `${formatNumber(o.users?.clients)} clients · ${formatNumber(o.users?.workers)} workers` : undefined}
         />
         <StatCard
           icon={Inbox}
           label="Open Requests"
           value={num(o?.openRequests?.total)}
+          href={adminPaths.openRequests}
           note={o ? `${formatNumber(o.openRequests?.open)} open posts · ${formatNumber(o.openRequests?.directHire)} direct hire` : undefined}
         />
       </div>
@@ -221,13 +234,11 @@ const Dashboard = () => {
         </Panel>
 
         <Panel title="Needs attention">
-          <Row label="Open disputes" value={num(o?.openDisputes)} href={adminPaths.disputes} />
-          <Row label="Open requests" value={num(o?.openRequests?.total)} href={adminPaths.openRequests} />
+          <Row label="Open disputes" value={num(o?.openDisputes)} href={tabPath(adminPaths.disputes, 'Open')} />
           <Row
-            label="Completed payouts"
-            value={cash(o?.payouts?.completedAmount)}
-            sub={o ? `${formatNumber(o.payouts?.completedCount)} withdrawals sent to banks` : undefined}
-            href={adminPaths.payouts}
+            label="Open support tickets"
+            value={openTickets === null ? '—' : formatNumber(openTickets)}
+            href={tabPath(adminPaths.supportTickets, 'open')}
           />
         </Panel>
       </div>

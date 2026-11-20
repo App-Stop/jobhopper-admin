@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ImageOff, RefreshCw, Search, TrendingDown, TrendingUp, X } from 'lucide-react'
 import { apiFileObjectUrl } from '../api/client'
+import { adminLinkClick } from '../navigation'
 
 // `count` renders as a pill next to the title; `actions` is the right-hand button group.
 export const AdminHeader = ({ title, subtitle, count, actions }) => (
@@ -97,13 +98,18 @@ export const AdminModal = ({ title, subtitle, onClose, footer, children, size = 
   )
 }
 
-export const StatCard = ({ icon: Icon, label, value, change, note, highlight = false }) => {
+// With `href` the whole card is an in-app link (e.g. a dashboard count that opens its list).
+export const StatCard = ({ icon: Icon, label, value, change, note, highlight = false, href }) => {
+  const Tag = href ? 'a' : 'article'
   const hasChange = change !== undefined && change !== null
   const up = change >= 0
   const Trend = up ? TrendingUp : TrendingDown
 
   return (
-    <article className={`admin-stat ${highlight ? 'admin-stat--primary' : ''}`}>
+    <Tag
+      className={`admin-stat ${highlight ? 'admin-stat--primary' : ''} ${href ? 'admin-stat--link' : ''}`}
+      {...(href ? { href, onClick: adminLinkClick(href) } : {})}
+    >
       <div className="admin-stat-top">
         <p className="admin-stat-label">{label}</p>
         <span className="admin-stat-icon">
@@ -118,7 +124,7 @@ export const StatCard = ({ icon: Icon, label, value, change, note, highlight = f
           {up ? '+' : ''}{change}% <span>vs last month</span>
         </p>
       )}
-    </article>
+    </Tag>
   )
 }
 

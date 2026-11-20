@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { Eye, MapPin, Zap } from 'lucide-react'
 import { AdminHeader, AdminModal, AdminTable, AdminToolbar, NameCell, Pager, FileImage, RefreshButton, StatusPill } from './AdminParts'
+import { initialTab } from '../navigation'
 import { apiRequest } from '../api/client'
 import useAdminList from '../hooks/useAdminList'
 import ListFilters from './ListFilters'
 import { ACTIVE_JOB_STATUSES, JOB_STATUS_GROUPS as FILTER_STATUSES, categoryNames, formatDateTime as formatDate, formatMoney as money } from '../constants'
 
-const FILTERS = ['All', ...Object.keys(FILTER_STATUSES).filter((key) => key !== 'Open')]
+// `Active` = booked, in progress or awaiting confirmation (the dashboard's Active Jobs count).
+const FILTERS = ['All', 'Active', ...Object.keys(FILTER_STATUSES).filter((key) => key !== 'Open')]
+const filterStatuses = (filter) => (filter === 'All' ? '' : filter === 'Active' ? ACTIVE_JOB_STATUSES.join(',') : FILTER_STATUSES[filter].join(','))
 
 const URGENCY_LABELS = { standard: 'Standard', within_24h: 'Within 24h', asap: 'ASAP' }
 
@@ -19,9 +22,9 @@ const formatAddress = (a) =>
 const jobAmount = (j) => j.finalAmount ?? j.budget
 
 const Jobs = () => {
-  const [filter, setFilter] = useState('All')
+  const [filter, setFilter] = useState(() => initialTab(FILTERS))
   const [filters, setFilters] = useState({})
-  const { rows: jobs, counts, pagination, query, setQuery, page, setPage, error, loading, refresh: loadJobs } = useAdminList('/admin/jobs', 'jobs', { ...filters, status: filters.status?.length ? filters.status.join(',') : filter === 'All' ? '' : FILTER_STATUSES[filter].join(',') })
+  const { rows: jobs, counts, pagination, query, setQuery, page, setPage, error, loading, refresh: loadJobs } = useAdminList('/admin/jobs', 'jobs', { ...filters, status: filters.status?.length ? filters.status.join(',') : filterStatuses(filter) })
   const [selectedJob, setSelectedJob] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')

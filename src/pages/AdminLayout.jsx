@@ -9,9 +9,33 @@ import {
   Tag,
   SlidersHorizontal,
   LogOut,
+  Bell,
 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import logo from '../assets/logo.png'
 import { adminLinkClick, adminPaths } from '../navigation'
+import { apiCount } from '../api/client'
+import { NOTIFICATIONS_CHANGED_EVENT } from '../utils/notifications'
+
+// Number of failed broadcast notifications, for the sidebar badge. Errors leave the badge hidden.
+const useFailedNotifications = () => {
+  const [count, setCount] = useState(0)
+  useEffect(() => {
+    let live = true
+    const load = () => apiCount('/admin/notifications', { status: 'failed' }).then((n) => live && setCount(n)).catch(() => {})
+    const onChange = (event) => {
+      if (typeof event.detail?.failed === 'number') setCount(event.detail.failed)
+      else load()
+    }
+    load()
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, onChange)
+    return () => {
+      live = false
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, onChange)
+    }
+  }, [])
+  return count
+}
 
 const NAV = [
   { page: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -23,11 +47,15 @@ const NAV = [
   { page: 'disputes', label: 'Disputes', icon: AlertTriangle },
   { page: 'supportTickets', label: 'Support Tickets', icon: Inbox },
   { page: 'userReports', label: 'User Reports', icon: ShieldCheck },
+  { page: 'notifications', label: 'Notifications', icon: Bell },
   { page: 'categories', label: 'Categories', icon: Tag },
   { page: 'settings', label: 'Fees & Platform', icon: SlidersHorizontal },
 ]
 
-const AdminLayout = ({ page, session, onLogout, children }) => (
+const AdminLayout = ({ page, session, onLogout, children }) => {
+  const failedNotifications = useFailedNotifications()
+  const badges = { notifications: failedNotifications }
+  return (
   <div className="admin-shell">
     <aside className="admin-sidebar">
       <a
@@ -49,6 +77,11 @@ const AdminLayout = ({ page, session, onLogout, children }) => (
           >
             <Icon strokeWidth={1.5} />
             <span>{label}</span>
+            {badges[id] > 0 && (
+              <span className="admin-nav-badge" title={`${badges[id]} failed`} aria-label={`${badges[id]} failed`}>
+                {badges[id] > 99 ? '99+' : badges[id]}
+              </span>
+            )}
           </a>
         ))}
       </nav>
@@ -81,6 +114,7 @@ const AdminLayout = ({ page, session, onLogout, children }) => (
 
     <main className="admin-main">{children}</main>
   </div>
-)
+  )
+}
 
 export default AdminLayout
