@@ -5,9 +5,6 @@ import { adminLinkClick, adminPaths, tabPath } from '../navigation'
 import { apiCount, apiRequest } from '../api/client'
 import { categoryNames, formatMoney, formatDate } from '../constants'
 
-const formatCurrency = (val) =>
-  Number(val || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
-
 const formatNumber = (val) => Number(val || 0).toLocaleString('en-US')
 
 const JOB_COLUMNS = [
@@ -185,8 +182,8 @@ const Dashboard = () => {
         <StatCard
           icon={DollarSign}
           label="Platform Revenue"
-          value={o ? formatCurrency(o.revenue?.allTime) : '—'}
-          note={o ? `${formatCurrency(o.revenue?.thisMonth)} this month (UTC)` : undefined}
+          value={cash(o?.revenue?.allTime ?? 0)}
+          note={o ? `${formatMoney(o.revenue?.thisMonth ?? 0)} this month (UTC)` : undefined}
         />
         <StatCard
           icon={Users}
